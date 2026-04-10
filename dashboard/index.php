@@ -131,7 +131,7 @@ renderNav('overview');
 
         <!-- Sessions -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
-            <h2 style="font-size:16px;color:#fff;">CONVERSATIONS <span style="color:#666;font-size:14px;">(<?php echo number_format($totalRows); ?>)</span></h2>
+            <h2 style="font-size:16px;color:var(--text-bright);">CONVERSATIONS <span style="color:var(--text-muted);font-size:14px;">(<?php echo number_format($totalRows); ?>)</span></h2>
             <div style="display:flex;gap:4px;">
                 <a href="api.php?action=export&format=csv&range=<?php echo e($range); ?>" class="btn btn-sm">CSV</a>
                 <a href="api.php?action=export&format=json&range=<?php echo e($range); ?>" class="btn btn-sm">JSON</a>

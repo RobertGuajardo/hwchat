@@ -89,7 +89,7 @@ renderNav('overview');
         <?php endif; ?>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-            <h2 style="font-size:16px;color:#fff;">CONVERSATION (<?php echo count($messages); ?>)</h2>
+            <h2 style="font-size:16px;color:var(--text-bright);">CONVERSATION (<?php echo count($messages); ?>)</h2>
         </div>
 
         <?php if (empty($messages)): ?>
@@ -111,7 +111,7 @@ renderNav('overview');
             <?php endforeach; ?>
         <?php endif; ?>
 
-        <div style="display:flex;gap:8px;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;gap:8px;margin-top:32px;padding-top:24px;border-top:1px solid var(--border);">
             <a href="index.php" class="btn">← BACK</a>
             <button class="btn btn-danger" onclick="deleteSession()">DELETE SESSION</button>
         </div>
