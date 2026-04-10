@@ -77,7 +77,7 @@ renderNav('tenants');
         <?php endif; ?>
 
         <div class="action-bar">
-            <h2>TENANTS <span style="color:#666;font-size:14px;">(<?php echo count($tenants); ?>)</span></h2>
+            <h2>TENANTS <span style="color:var(--text-muted);font-size:14px;">(<?php echo count($tenants); ?>)</span></h2>
             <button class="btn btn-primary" onclick="document.getElementById('createModal').style.display='flex'">+ NEW TENANT</button>
         </div>
 

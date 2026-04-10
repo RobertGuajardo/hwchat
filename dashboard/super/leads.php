@@ -80,7 +80,7 @@ renderNav('leads');
         </form>
 
         <div class="action-bar">
-            <h2>LEADS <span style="color:#666;font-size:14px;">(<?php echo number_format($totalRows); ?>)</span></h2>
+            <h2>LEADS <span style="color:var(--text-muted);font-size:14px;">(<?php echo number_format($totalRows); ?>)</span></h2>
         </div>
 
         <?php if (empty($leads)): ?>

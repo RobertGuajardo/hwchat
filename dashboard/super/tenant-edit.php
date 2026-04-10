@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var btn = document.createElement('button');
     btn.type = 'submit';
     btn.textContent = 'SAVE SETTINGS';
-    btn.style.cssText = 'position:fixed;bottom:24px;right:32px;z-index:99999;background:#3B7DD8;color:#fff;border:none;border-radius:8px;padding:14px 28px;font-size:14px;font-weight:600;font-family:DM Sans,sans-serif;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.4);letter-spacing:0.04em;';
+    btn.style.cssText = 'position:fixed;bottom:24px;right:32px;z-index:99999;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:14px 28px;font-size:14px;font-weight:600;font-family:DM Sans,sans-serif;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.4);letter-spacing:0.04em;';
     btn.addEventListener('click', function() { form.submit(); });
     document.body.appendChild(btn);
 });
