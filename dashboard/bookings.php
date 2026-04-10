@@ -158,7 +158,7 @@ renderHead('Bookings');
             <h1><?php echo e(strtoupper(getTenantName())); ?></h1>
         </div>
         <div class="topbar-right">
-            <span style="font-family:'Space Mono',monospace;font-size:11px;color:#555;"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
+            <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text-muted);"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
             <a href="logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
     </header>
@@ -182,7 +182,7 @@ renderHead('Bookings');
         <!-- Month navigation -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <a href="?view=calendar&month=<?php echo $prevMonth; ?>" class="btn btn-sm">← <?php echo (clone $firstDay)->modify('-1 month')->format('M'); ?></a>
-            <h2 style="font-size:18px;color:#fff;font-family:'Syne',sans-serif;letter-spacing:0.04em;"><?php echo strtoupper($monthLabel); ?></h2>
+            <h2 style="font-size:18px;color:var(--text-bright);font-family:'Syne',sans-serif;letter-spacing:0.04em;"><?php echo strtoupper($monthLabel); ?></h2>
             <a href="?view=calendar&month=<?php echo $nextMonth; ?>" class="btn btn-sm"><?php echo (clone $firstDay)->modify('+1 month')->format('M'); ?> →</a>
         </div>
 
@@ -237,9 +237,9 @@ renderHead('Bookings');
         <!-- Selected day detail -->
         <?php if ($selectedDate): ?>
         <div style="margin-top:24px;">
-            <h3 style="font-size:14px;color:#fff;font-family:'Syne',sans-serif;margin-bottom:16px;letter-spacing:0.06em;">
+            <h3 style="font-size:14px;color:var(--text-bright);font-family:'Syne',sans-serif;margin-bottom:16px;letter-spacing:0.06em;">
                 <?php echo e(date('l, F j, Y', strtotime($selectedDate))); ?>
-                <span style="color:#666;font-weight:400;margin-left:8px;">(<?php echo count($selectedBookings); ?> booking<?php echo count($selectedBookings) !== 1 ? 's' : ''; ?>)</span>
+                <span style="color:var(--text-muted);font-weight:400;margin-left:8px;">(<?php echo count($selectedBookings); ?> booking<?php echo count($selectedBookings) !== 1 ? 's' : ''; ?>)</span>
                 <?php if ($selectedIsFullDayBlocked): ?>
                     <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);margin-left:8px;">BLOCKED</span>
                 <?php endif; ?>
@@ -259,7 +259,7 @@ renderHead('Bookings');
                             <?php endif; ?>
                         </span>
                         <?php if ($o['reason']): ?>
-                            <span style="color:#888;font-size:12px;margin-left:8px;">— <?php echo e($o['reason']); ?></span>
+                            <span style="color:var(--text-muted);font-size:12px;margin-left:8px;">— <?php echo e($o['reason']); ?></span>
                         <?php endif; ?>
                     </div>
                     <form method="POST" style="display:inline;" onsubmit="return confirm('Remove this block?');">
@@ -274,8 +274,8 @@ renderHead('Bookings');
             <?php endif; ?>
 
             <!-- Block-off controls -->
-            <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:20px;margin-bottom:16px;">
-                <h4 style="font-family:'Space Mono',monospace;font-size:11px;color:#666;letter-spacing:0.08em;margin-bottom:12px;">BLOCK OFF TIME</h4>
+            <div style="background:var(--bg-card);border:1px solid var(--border);padding:20px;margin-bottom:16px;">
+                <h4 style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text-muted);letter-spacing:0.08em;margin-bottom:12px;">BLOCK OFF TIME</h4>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
                     <!-- Full day block -->
                     <?php if (!$selectedIsFullDayBlocked): ?>
@@ -289,12 +289,12 @@ renderHead('Bookings');
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Block off the entire day?');">BLOCK FULL DAY</button>
                     </form>
                     <?php else: ?>
-                    <span style="font-size:12px;color:#888;">Full day is already blocked. Remove the block above to modify.</span>
+                    <span style="font-size:12px;color:var(--text-muted);">Full day is already blocked. Remove the block above to modify.</span>
                     <?php endif; ?>
                 </div>
 
                 <?php if (!$selectedIsFullDayBlocked): ?>
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
                     <form method="POST" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
                         <input type="hidden" name="action" value="block_time">
                         <input type="hidden" name="block_date" value="<?php echo e($selectedDate); ?>">
@@ -325,13 +325,13 @@ renderHead('Bookings');
             </div>
 
             <?php if (empty($selectedBookings)): ?>
-                <div style="padding:24px;color:#555;text-align:center;background:#141414;border:1px solid rgba(255,255,255,0.06);">No bookings on this day.</div>
+                <div style="padding:24px;color:var(--text-muted);text-align:center;background:var(--bg-card);border:1px solid var(--border);">No bookings on this day.</div>
             <?php else: ?>
                 <?php foreach ($selectedBookings as $b):
                     $st = new DateTime($b['start_time']);
                     $et = new DateTime($b['end_time']);
                 ?>
-                <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:16px 20px;margin-bottom:8px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+                <div style="background:var(--bg-card);border:1px solid var(--border);padding:16px 20px;margin-bottom:8px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
                     <div style="flex:1;">
                         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
                             <span style="font-family:'Space Mono',monospace;font-size:13px;color:#A78BFA;"><?php echo e($st->format('g:i A') . ' – ' . $et->format('g:i A')); ?></span>
@@ -341,13 +341,13 @@ renderHead('Bookings');
                                 <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);">CANCELLED</span>
                             <?php endif; ?>
                         </div>
-                        <div style="font-size:14px;color:#ddd;margin-bottom:4px;"><?php echo e($b['guest_name']); ?></div>
-                        <div style="font-size:12px;color:#888;">
+                        <div style="font-size:14px;color:var(--text);margin-bottom:4px;"><?php echo e($b['guest_name']); ?></div>
+                        <div style="font-size:12px;color:var(--text-muted);">
                             <a href="mailto:<?php echo e($b['guest_email']); ?>" style="color:#FF4D2E;"><?php echo e($b['guest_email']); ?></a>
                             <?php if ($b['guest_phone']): ?> · <?php echo e($b['guest_phone']); ?><?php endif; ?>
                         </div>
                         <?php if ($b['guest_notes']): ?>
-                            <div style="font-size:12px;color:#666;margin-top:6px;">Notes: <?php echo e($b['guest_notes']); ?></div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Notes: <?php echo e($b['guest_notes']); ?></div>
                         <?php endif; ?>
                     </div>
                     <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -387,7 +387,7 @@ renderHead('Bookings');
                     <tr>
                         <td style="white-space:nowrap;"><?php echo e(date('M j, Y', strtotime($b['booking_date']))); ?></td>
                         <td style="white-space:nowrap;"><?php $st=new DateTime($b['start_time']); $et=new DateTime($b['end_time']); echo e($st->format('g:i A').' – '.$et->format('g:i A')); ?></td>
-                        <td><?php echo e($b['guest_name']); ?><?php if($b['guest_phone']): ?><span style="color:#555;font-size:12px;"> · <?php echo e($b['guest_phone']); ?></span><?php endif; ?></td>
+                        <td><?php echo e($b['guest_name']); ?><?php if($b['guest_phone']): ?><span style="color:var(--text-muted);font-size:12px;"> · <?php echo e($b['guest_phone']); ?></span><?php endif; ?></td>
                         <td><a href="mailto:<?php echo e($b['guest_email']); ?>"><?php echo e($b['guest_email']); ?></a></td>
                         <td>
                             <?php if ($b['status']==='confirmed'): ?><span class="badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">CONFIRMED</span>
@@ -416,19 +416,19 @@ renderHead('Bookings');
     </main>
 
     <style>
-    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); }
-    .cal-header { padding:10px 4px; text-align:center; font-family:'Space Mono',monospace; font-size:11px; color:#666; letter-spacing:0.06em; background:#111; }
-    .cal-cell { min-height:72px; padding:8px; background:#0c0c0c; display:flex; flex-direction:column; align-items:flex-start; text-decoration:none; transition:background 0.15s; cursor:pointer; }
-    .cal-cell:hover { background:#141414; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--bg-hover); border:1px solid var(--border); }
+    .cal-header { padding:10px 4px; text-align:center; font-family:'Space Mono',monospace; font-size:11px; color:var(--text-muted); letter-spacing:0.06em; background:var(--bg-topbar); }
+    .cal-cell { min-height:72px; padding:8px; background:var(--bg-body); display:flex; flex-direction:column; align-items:flex-start; text-decoration:none; transition:background 0.15s; cursor:pointer; }
+    .cal-cell:hover { background:var(--bg-card); }
     .cal-empty { cursor:default; }
-    .cal-empty:hover { background:#0c0c0c; }
+    .cal-empty:hover { background:var(--bg-body); }
     .cal-today { background:rgba(255,77,46,0.06); border-left:2px solid #FF4D2E; }
     .cal-today:hover { background:rgba(255,77,46,0.1); }
     .cal-selected { background:rgba(139,92,246,0.1) !important; border-left:2px solid #8B5CF6; }
-    .cal-day-num { font-size:14px; font-weight:600; color:rgba(255,255,255,0.6); font-family:'Syne',sans-serif; }
+    .cal-day-num { font-size:14px; font-weight:600; color:var(--text-muted); font-family:'Syne',sans-serif; }
     .cal-today .cal-day-num { color:#FF4D2E; }
     .cal-selected .cal-day-num { color:#A78BFA; }
-    .cal-has-bookings .cal-day-num { color:#fff; }
+    .cal-has-bookings .cal-day-num { color:var(--text-bright); }
     .cal-dot-row { display:flex; gap:3px; margin-top:6px; align-items:center; }
     .cal-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; }
     .cal-dot-blocked { background:#f87171; width:8px; height:8px; }
