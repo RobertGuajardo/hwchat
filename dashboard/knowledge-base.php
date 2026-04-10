@@ -153,7 +153,7 @@ renderHead('Knowledge Base');
             <h1><?php echo e(strtoupper(getTenantName())); ?></h1>
         </div>
         <div class="topbar-right">
-            <span style="font-family:'Space Mono',monospace;font-size:11px;color:#555;"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
+            <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text-muted);"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
             <a href="logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
     </header>
@@ -199,8 +199,8 @@ renderHead('Knowledge Base');
 
     <?php if ($tab === 'faq'): ?>
         <!-- Add FAQ form -->
-        <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:24px;margin-bottom:24px;">
-            <h3 style="font-size:14px;color:#fff;font-family:'Syne',sans-serif;margin-bottom:16px;">ADD FAQ ENTRY</h3>
+        <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px;margin-bottom:24px;">
+            <h3 style="font-size:14px;color:var(--text-bright);font-family:'Syne',sans-serif;margin-bottom:16px;">ADD FAQ ENTRY</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add_faq">
                 <div class="form-group">
@@ -224,13 +224,13 @@ renderHead('Knowledge Base');
             <div class="empty-state">No FAQ entries yet. Add common questions and answers your chatbot should know.</div>
         <?php else: ?>
             <?php foreach ($faqEntries as $e): ?>
-            <div style="background:<?php echo $e['is_active'] ? '#141414' : '#0c0c0c'; ?>;border:1px solid <?php echo $e['is_active'] ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'; ?>;padding:16px 20px;margin-bottom:8px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
+            <div style="background:<?php echo $e['is_active'] ? 'var(--bg-card)' : 'var(--bg-body)'; ?>;border:1px solid <?php echo $e['is_active'] ? 'var(--border)' : 'var(--border-light)'; ?>;padding:16px 20px;margin-bottom:8px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                     <div style="flex:1;">
                         <div style="font-size:14px;color:#A78BFA;margin-bottom:6px;font-weight:500;">Q: <?php echo e($e['title']); ?></div>
-                        <div style="font-size:13px;color:#ccc;line-height:1.6;white-space:pre-wrap;"><?php echo e($e['content']); ?></div>
+                        <div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;"><?php echo e($e['content']); ?></div>
                         <?php if ($e['category']): ?>
-                            <span style="display:inline-block;margin-top:8px;font-size:11px;font-family:'Space Mono',monospace;color:#666;background:rgba(255,255,255,0.04);padding:2px 8px;"><?php echo e($e['category']); ?></span>
+                            <span style="display:inline-block;margin-top:8px;font-size:11px;font-family:'Space Mono',monospace;color:var(--text-muted);background:var(--bg-input);padding:2px 8px;"><?php echo e($e['category']); ?></span>
                         <?php endif; ?>
                     </div>
                     <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -244,8 +244,8 @@ renderHead('Knowledge Base');
 
     <?php elseif ($tab === 'scrape'): ?>
         <!-- Scrape single URL -->
-        <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:24px;margin-bottom:16px;">
-            <h3 style="font-size:14px;color:#fff;font-family:'Syne',sans-serif;margin-bottom:4px;">SCRAPE SINGLE PAGE</h3>
+        <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px;margin-bottom:16px;">
+            <h3 style="font-size:14px;color:var(--text-bright);font-family:'Syne',sans-serif;margin-bottom:4px;">SCRAPE SINGLE PAGE</h3>
             <p class="form-hint" style="margin-bottom:16px;">Paste a URL and we'll extract the content for your chatbot to learn from.</p>
             <form method="POST" style="display:flex;gap:8px;align-items:flex-end;">
                 <input type="hidden" name="action" value="scrape_url">
@@ -258,8 +258,8 @@ renderHead('Knowledge Base');
         </div>
 
         <!-- Crawl entire site -->
-        <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:24px;margin-bottom:24px;">
-            <h3 style="font-size:14px;color:#fff;font-family:'Syne',sans-serif;margin-bottom:4px;">CRAWL ENTIRE WEBSITE</h3>
+        <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px;margin-bottom:24px;">
+            <h3 style="font-size:14px;color:var(--text-bright);font-family:'Syne',sans-serif;margin-bottom:4px;">CRAWL ENTIRE WEBSITE</h3>
             <p class="form-hint" style="margin-bottom:16px;">Enter the homepage URL and we'll automatically find and scrape all pages on the site.</p>
             <form method="POST">
                 <input type="hidden" name="action" value="crawl_site">
@@ -287,12 +287,12 @@ renderHead('Knowledge Base');
             <div class="empty-state">No pages scraped yet. Paste a URL above to import content from any website.</div>
         <?php else: ?>
             <?php foreach ($webEntries as $e): ?>
-            <div style="background:<?php echo $e['is_active'] ? '#141414' : '#0c0c0c'; ?>;border:1px solid <?php echo $e['is_active'] ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'; ?>;padding:16px 20px;margin-bottom:8px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
+            <div style="background:<?php echo $e['is_active'] ? 'var(--bg-card)' : 'var(--bg-body)'; ?>;border:1px solid <?php echo $e['is_active'] ? 'var(--border)' : 'var(--border-light)'; ?>;padding:16px 20px;margin-bottom:8px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                     <div style="flex:1;">
-                        <?php if ($e['title']): ?><div style="font-size:14px;color:#fff;margin-bottom:4px;font-weight:500;"><?php echo e($e['title']); ?></div><?php endif; ?>
+                        <?php if ($e['title']): ?><div style="font-size:14px;color:var(--text-bright);margin-bottom:4px;font-weight:500;"><?php echo e($e['title']); ?></div><?php endif; ?>
                         <div style="font-size:12px;color:#FF4D2E;margin-bottom:6px;font-family:'Space Mono',monospace;"><?php echo e($e['source_ref'] ?? ''); ?></div>
-                        <div style="font-size:13px;color:#999;line-height:1.5;max-height:80px;overflow:hidden;"><?php echo e(substr($e['content'], 0, 300)); ?><?php echo strlen($e['content']) > 300 ? '...' : ''; ?></div>
+                        <div style="font-size:13px;color:var(--text-muted);line-height:1.5;max-height:80px;overflow:hidden;"><?php echo e(substr($e['content'], 0, 300)); ?><?php echo strlen($e['content']) > 300 ? '...' : ''; ?></div>
                     </div>
                     <div style="display:flex;gap:4px;flex-shrink:0;">
                         <form method="POST" style="display:inline;"><input type="hidden" name="action" value="toggle"><input type="hidden" name="entry_id" value="<?php echo $e['id']; ?>"><button type="submit" class="btn btn-sm"><?php echo $e['is_active'] ? 'DISABLE' : 'ENABLE'; ?></button></form>
@@ -305,8 +305,8 @@ renderHead('Knowledge Base');
 
     <?php elseif ($tab === 'manual'): ?>
         <!-- Add manual entry form -->
-        <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:24px;margin-bottom:24px;">
-            <h3 style="font-size:14px;color:#fff;font-family:'Syne',sans-serif;margin-bottom:4px;">ADD KNOWLEDGE ENTRY</h3>
+        <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px;margin-bottom:24px;">
+            <h3 style="font-size:14px;color:var(--text-bright);font-family:'Syne',sans-serif;margin-bottom:4px;">ADD KNOWLEDGE ENTRY</h3>
             <p class="form-hint" style="margin-bottom:16px;">Add any info you want your chatbot to know — services, pricing, policies, team bios, anything.</p>
             <form method="POST">
                 <input type="hidden" name="action" value="add_manual">
@@ -331,13 +331,13 @@ renderHead('Knowledge Base');
             <div class="empty-state">No manual entries yet.</div>
         <?php else: ?>
             <?php foreach ($manualAll as $e): ?>
-            <div style="background:#141414;border:1px solid rgba(255,255,255,0.06);padding:16px 20px;margin-bottom:8px;">
+            <div style="background:var(--bg-card);border:1px solid var(--border);padding:16px 20px;margin-bottom:8px;">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                     <div style="flex:1;">
-                        <?php if ($e['title']): ?><div style="font-size:14px;color:#fff;margin-bottom:4px;font-weight:500;"><?php echo e($e['title']); ?></div><?php endif; ?>
-                        <div style="font-size:13px;color:#ccc;line-height:1.6;white-space:pre-wrap;max-height:120px;overflow:hidden;"><?php echo e(substr($e['content'], 0, 500)); ?></div>
+                        <?php if ($e['title']): ?><div style="font-size:14px;color:var(--text-bright);margin-bottom:4px;font-weight:500;"><?php echo e($e['title']); ?></div><?php endif; ?>
+                        <div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;max-height:120px;overflow:hidden;"><?php echo e(substr($e['content'], 0, 500)); ?></div>
                         <?php if ($e['category']): ?>
-                            <span style="display:inline-block;margin-top:8px;font-size:11px;font-family:'Space Mono',monospace;color:#666;background:rgba(255,255,255,0.04);padding:2px 8px;"><?php echo e($e['category']); ?></span>
+                            <span style="display:inline-block;margin-top:8px;font-size:11px;font-family:'Space Mono',monospace;color:var(--text-muted);background:var(--bg-input);padding:2px 8px;"><?php echo e($e['category']); ?></span>
                         <?php endif; ?>
                     </div>
                     <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -354,14 +354,14 @@ renderHead('Knowledge Base');
             <div class="empty-state">No knowledge base entries. Add FAQ entries, scrape websites, or add manual content to train your chatbot.</div>
         <?php else: ?>
             <?php foreach ($allEntries as $e): ?>
-            <div style="background:<?php echo $e['is_active'] ? '#141414' : '#0c0c0c'; ?>;border:1px solid rgba(255,255,255,0.06);padding:12px 16px;margin-bottom:4px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
+            <div style="background:<?php echo $e['is_active'] ? 'var(--bg-card)' : 'var(--bg-body)'; ?>;border:1px solid var(--border);padding:12px 16px;margin-bottom:4px;<?php echo !$e['is_active'] ? 'opacity:0.5;' : ''; ?>">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
                     <div style="flex:1;min-width:0;">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                             <span class="badge" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);text-transform:uppercase;"><?php echo e($e['source_type']); ?></span>
-                            <?php if ($e['title']): ?><span style="font-size:13px;color:#fff;"><?php echo e(substr($e['title'], 0, 60)); ?></span><?php endif; ?>
+                            <?php if ($e['title']): ?><span style="font-size:13px;color:var(--text-bright);"><?php echo e(substr($e['title'], 0, 60)); ?></span><?php endif; ?>
                         </div>
-                        <div style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo e(substr($e['content'], 0, 120)); ?></div>
+                        <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo e(substr($e['content'], 0, 120)); ?></div>
                     </div>
                     <div style="display:flex;gap:4px;flex-shrink:0;">
                         <form method="POST" style="display:inline;"><input type="hidden" name="action" value="toggle"><input type="hidden" name="entry_id" value="<?php echo $e['id']; ?>"><button type="submit" class="btn btn-sm" style="font-size:10px;"><?php echo $e['is_active'] ? 'OFF' : 'ON'; ?></button></form>
