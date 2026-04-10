@@ -1,0 +1,43 @@
+# === Credentials (CRITICAL) ===
+config.php
+config.php.mariadb.bak
+
+# === Logs ===
+logs/
+*.log
+error_log
+chat_errors.log
+
+# === Backup / working copies ===
+*.bak
+*.bak1
+*.bak2
+*.bak3
+*_working_file
+*_working_File
+*_not_working
+*.xo-working
+*.apr6-working
+*.apr7-working
+*.apr8-working
+*_notworking.php
+
+# === Archives / old cleanup bundles ===
+file-clean-up/
+
+# === SQL data dumps (keep migrations, ignore ad-hoc dumps) ===
+*.sql
+!migrations/*.sql
+
+# === OS / editor junk ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# === PHP ===
+vendor/
+composer.lock
