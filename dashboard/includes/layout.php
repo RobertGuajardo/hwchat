@@ -24,12 +24,14 @@ function renderHead(string $title): void {
         --navy-card:   #162240;
         --blue:        #3B7DD8;
         --blue-light:  #5B9BE6;
+        --blue-hover:  #93bef0;
         --green:       #4A8C5C;
         --green-light: #68A97A;
         --gold:        #C9A96E;
         --text:        #CBD5E1;
         --text-muted:  #6B7A94;
         --text-bright: #F1F5F9;
+        --placeholder: rgba(255,255,255,0.2);
         --border:      rgba(255,255,255,0.08);
         --border-light: rgba(255,255,255,0.12);
         --bg-body:     #0F1D36;
@@ -48,12 +50,14 @@ function renderHead(string $title): void {
         --navy-card:   #FFFFFF;
         --blue:        #2563EB;
         --blue-light:  #3B7DD8;
+        --blue-hover:  #1D4ED8;
         --green:       #4A8C5C;
         --green-light: #3D7A52;
         --gold:        #B45309;
         --text:        #334155;
         --text-muted:  #64748B;
         --text-bright: #0F172A;
+        --placeholder: rgba(0,0,0,0.3);
         --border:      rgba(0,0,0,0.08);
         --border-light: rgba(0,0,0,0.13);
         --bg-body:     #F1F5F9;
@@ -72,12 +76,14 @@ function renderHead(string $title): void {
         --navy-card:   #161616;
         --blue:        #3B7DD8;
         --blue-light:  #5B9BE6;
+        --blue-hover:  #93bef0;
         --green:       #4A8C5C;
         --green-light: #68A97A;
         --gold:        #C9A96E;
         --text:        #CBD5E1;
         --text-muted:  #4B5563;
         --text-bright: #F8FAFC;
+        --placeholder: rgba(255,255,255,0.2);
         --border:      rgba(255,255,255,0.06);
         --border-light: rgba(255,255,255,0.10);
         --bg-body:     #0A0A0A;
@@ -96,7 +102,7 @@ function renderHead(string $title): void {
     }
     h1, h2, h3 { font-family: 'DM Sans', sans-serif; font-weight: 600; letter-spacing: 0.02em; color: var(--text-bright); }
     a { color: var(--blue-light); text-decoration: none; }
-    a:hover { color: #93bef0; }
+    a:hover { color: var(--blue-hover); }
 
     /* Topbar */
     .topbar {
@@ -139,7 +145,7 @@ function renderHead(string $title): void {
     .btn:hover { background: var(--bg-hover2); color: var(--text-bright); }
     .btn-sm { padding: 6px 12px; font-size: 11px; }
     .btn-ghost { background: transparent; border-color: transparent; }
-    .btn-ghost:hover { background: rgba(255,255,255,0.05); }
+    .btn-ghost:hover { background: var(--bg-hover); }
     .btn-danger { color: #f87171; border-color: rgba(239,68,68,0.3); }
     .btn-danger:hover { background: rgba(239,68,68,0.12); }
     .btn-primary {
@@ -154,7 +160,7 @@ function renderHead(string $title): void {
     .filter-label { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.08em; }
     .filter-pills { display: flex; gap: 4px; }
     .pill {
-        padding: 6px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+        padding: 6px 14px; background: var(--bg-input); border: 1px solid var(--border);
         color: var(--text-muted); font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
     }
     .pill:hover { color: var(--text); border-color: var(--border-light); }
@@ -212,7 +218,7 @@ function renderHead(string $title): void {
         color: var(--text-bright); font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none;
     }
     .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(59,125,216,0.15); }
-    .form-input::placeholder, .form-textarea::placeholder { color: rgba(255,255,255,0.2); }
+    .form-input::placeholder, .form-textarea::placeholder { color: var(--placeholder); }
     .form-textarea { min-height: 120px; resize: vertical; font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6; }
     .form-select { cursor: pointer; }
     .form-select option { background: var(--navy-card); }
@@ -282,6 +288,25 @@ function renderHead(string $title): void {
         color: var(--blue-light); word-break: break-all; line-height: 1.6;
     }
 
+    /* ── Utility Classes ── */
+    /* Text colors (replace inline color:#fff, color:#ccc, color:#666, etc.) */
+    .text-bright { color: var(--text-bright); }
+    .text-default { color: var(--text); }
+    .text-muted { color: var(--text-muted); }
+
+    /* Background + border cards (replace inline background:#141414 + border patterns) */
+    .card { background: var(--bg-card); border: 1px solid var(--border); }
+    .card-subtle { background: var(--bg-body); border: 1px solid var(--border); }
+
+    /* Common section header pattern (replace inline font-size:16px;color:#fff) */
+    .section-title { font-size: 16px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.02em; }
+    .section-subtitle { font-size: 13px; color: var(--text-muted); }
+
+    /* Label/value pattern used in detail views */
+    .label { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
+    .value { font-size: 14px; color: var(--text); }
+    .value-bright { font-size: 14px; color: var(--text-bright); }
+
     /* Responsive */
     @media (max-width: 768px) {
         .topbar { padding: 12px 16px; }
@@ -318,7 +343,7 @@ function renderHead(string $title): void {
         display: flex; align-items: center; justify-content: space-between;
         padding: 16px 0; margin-bottom: 24px; border-bottom: 1px solid var(--border);
     }
-    .action-bar h2 { font-size: 16px; color: #fff; }
+    .action-bar h2 { font-size: 16px; color: var(--text-bright); }
     </style>
     <script>
     // Apply theme immediately to prevent flash
