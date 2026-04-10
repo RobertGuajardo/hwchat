@@ -416,13 +416,13 @@ renderNav('settings');
                             $startTime = $hasRules ? substr($rules[0]['start_time'], 0, 5) : '09:00';
                             $endTime = $hasRules ? substr($rules[count($rules) - 1]['end_time'], 0, 5) : '17:00';
                     ?>
-                        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
                             <label style="width:36px;">
                                 <input type="checkbox" name="avail_day_<?php echo $dow; ?>_enabled" value="1" <?php echo $hasRules ? 'checked' : ''; ?>>
                             </label>
-                            <span style="width:100px;font-size:13px;color:<?php echo $hasRules ? '#fff' : '#555'; ?>;"><?php echo $dayName; ?></span>
+                            <span style="width:100px;font-size:13px;color:<?php echo $hasRules ? 'var(--text-bright)' : 'var(--text-muted)'; ?>;"><?php echo $dayName; ?></span>
                             <input type="time" name="avail_day_<?php echo $dow; ?>_start" value="<?php echo $startTime; ?>" class="form-input" style="width:120px;padding:6px 8px;font-size:12px;">
-                            <span style="color:#555;">to</span>
+                            <span style="color:var(--text-muted);">to</span>
                             <input type="time" name="avail_day_<?php echo $dow; ?>_end" value="<?php echo $endTime; ?>" class="form-input" style="width:120px;padding:6px 8px;font-size:12px;">
                         </div>
                     <?php endforeach; ?>
@@ -471,8 +471,8 @@ renderNav('settings');
             <?php if (!empty($builders)): ?>
             <div style="margin-bottom:16px;">
                 <?php foreach ($builders as $b): ?>
-                <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);">
-                    <span style="flex:1;font-size:14px;color:#fff;"><?php echo e($b['name']); ?></span>
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
+                    <span style="flex:1;font-size:14px;color:var(--text-bright);"><?php echo e($b['name']); ?></span>
                     <form method="POST" style="margin:0;" onsubmit="return confirm('Remove <?php echo e(addslashes($b['name'])); ?>?');">
                         <input type="hidden" name="action" value="remove_builder">
                         <input type="hidden" name="builder_id" value="<?php echo (int)$b['id']; ?>">
@@ -482,7 +482,7 @@ renderNav('settings');
                 <?php endforeach; ?>
             </div>
             <?php else: ?>
-            <p style="color:#555;font-size:13px;margin-bottom:16px;">No builders added yet.</p>
+            <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">No builders added yet.</p>
             <?php endif; ?>
 
             <form method="POST" style="display:flex;gap:8px;align-items:flex-end;">
