@@ -368,12 +368,18 @@ function renderNav(string $active = 'overview'): void {
             'communities'   => ['url' => 'communities.php',    'label' => 'COMMUNITIES'],
             'master'        => ['url' => 'master-prompt.php',  'label' => 'MASTER PROMPT'],
             'leads'         => ['url' => 'leads.php',          'label' => 'LEADS'],
+            'analytics'     => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
             'users'         => ['url' => 'users.php',          'label' => 'USERS'],
         ];
     } else {
         $tabs = [
             'overview'  => ['url' => 'index.php',           'label' => 'OVERVIEW'],
             'leads'     => ['url' => 'leads.php',           'label' => 'LEADS'],
+        ];
+        if (canAccessAnalytics()) {
+            $tabs['analytics'] = ['url' => 'analytics.php', 'label' => 'ANALYTICS'];
+        }
+        $tabs += [
             'bookings'  => ['url' => 'bookings.php',        'label' => 'BOOKINGS'],
             'knowledge' => ['url' => 'knowledge-base.php',  'label' => 'KNOWLEDGE'],
             'settings'  => ['url' => 'settings.php',        'label' => 'SETTINGS'],
