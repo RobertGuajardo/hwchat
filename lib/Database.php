@@ -480,6 +480,141 @@ class Database
     }
 
     // -----------------------------------------------------------------------
+    // USER AUTH METHODS
+    // -----------------------------------------------------------------------
+
+    /**
+     * Verify a user login against the users table.
+     * Updates last_login_at on success. Returns user data or null.
+     */
+    public static function verifyUserLogin(string $email, string $password): ?array
+    {
+        $stmt = self::db()->prepare('
+            SELECT id, email, password_hash, display_name, role
+            FROM users WHERE email = :email AND is_active = TRUE
+        ');
+        $stmt->execute(['email' => $email]);
+        $row = $stmt->fetch();
+
+        if (!$row || !password_verify($password, $row['password_hash'])) {
+            return null;
+        }
+
+        $update = self::db()->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
+        $update->execute(['id' => $row['id']]);
+
+        unset($row['password_hash']);
+        return $row;
+    }
+
+    /**
+     * Get tenants a user can access.
+     * Superadmins get all active tenants; others get only assigned tenants.
+     */
+    public static function getUserTenants(int $userId): array
+    {
+        // Check if superadmin
+        $stmt = self::db()->prepare('SELECT role FROM users WHERE id = :id');
+        $stmt->execute(['id' => $userId]);
+        $user = $stmt->fetch();
+
+        if ($user && $user['role'] === 'superadmin') {
+            $stmt = self::db()->query("
+                SELECT id, display_name, community_name, community_type
+                FROM tenants
+                WHERE is_active = TRUE AND role = 'tenant_admin'
+                ORDER BY community_name, display_name
+            ");
+            return $stmt->fetchAll();
+        }
+
+        $stmt = self::db()->prepare('
+            SELECT t.id, t.display_name, t.community_name, t.community_type
+            FROM user_tenants ut
+            JOIN tenants t ON ut.tenant_id = t.id
+            WHERE ut.user_id = :user_id AND t.is_active = TRUE
+            ORDER BY t.community_name, t.display_name
+        ');
+        $stmt->execute(['user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Fetch a user by ID (excludes password_hash).
+     */
+    public static function getUserById(int $userId): ?array
+    {
+        $stmt = self::db()->prepare('
+            SELECT id, email, display_name, role, is_active, last_login_at, created_at, updated_at
+            FROM users WHERE id = :id AND is_active = TRUE
+        ');
+        $stmt->execute(['id' => $userId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /**
+     * Create a new user with tenant assignments. Uses a transaction for atomicity.
+     */
+    public static function createUser(string $email, string $password, string $displayName, string $role, array $tenantIds): int
+    {
+        $db = self::db();
+        $db->beginTransaction();
+        try {
+            $hash = password_hash($password, PASSWORD_BCRYPT);
+            $stmt = $db->prepare('
+                INSERT INTO users (email, password_hash, display_name, role)
+                VALUES (:email, :hash, :name, :role)
+                RETURNING id
+            ');
+            $stmt->execute([
+                'email' => $email,
+                'hash'  => $hash,
+                'name'  => $displayName,
+                'role'  => $role,
+            ]);
+            $userId = (int)$stmt->fetch()['id'];
+
+            $insert = $db->prepare('
+                INSERT INTO user_tenants (user_id, tenant_id) VALUES (:uid, :tid)
+            ');
+            foreach ($tenantIds as $tid) {
+                $insert->execute(['uid' => $userId, 'tid' => $tid]);
+            }
+
+            $db->commit();
+            return $userId;
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Replace a user's tenant assignments. Uses a transaction for atomicity.
+     */
+    public static function updateUserTenants(int $userId, array $tenantIds): void
+    {
+        $db = self::db();
+        $db->beginTransaction();
+        try {
+            $db->prepare('DELETE FROM user_tenants WHERE user_id = :uid')
+               ->execute(['uid' => $userId]);
+
+            $insert = $db->prepare('
+                INSERT INTO user_tenants (user_id, tenant_id) VALUES (:uid, :tid)
+            ');
+            foreach ($tenantIds as $tid) {
+                $insert->execute(['uid' => $userId, 'tid' => $tid]);
+            }
+
+            $db->commit();
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // ANALYTICS METHODS
     // -----------------------------------------------------------------------
 
