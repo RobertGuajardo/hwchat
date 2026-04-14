@@ -21,7 +21,7 @@ try {
 }
 
 function isAuthenticated(): bool {
-    return !empty($_SESSION['tenant_id']) && !empty($_SESSION['tenant_email']);
+    return !empty($_SESSION['user_id']) || (!empty($_SESSION['tenant_id']) && !empty($_SESSION['tenant_email']));
 }
 
 function requireAuth(): void {
@@ -42,7 +42,7 @@ function requireSuperAdmin(): void {
 }
 
 function isSuperAdmin(): bool {
-    return ($_SESSION['tenant_role'] ?? '') === 'superadmin';
+    return ($_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? '') === 'superadmin';
 }
 
 function getTenantId(): string {
@@ -58,6 +58,26 @@ function getTenantRole(): string {
 }
 
 function attemptLogin(string $email, string $password): bool {
+    // Try users table first (new auth)
+    $user = Database::verifyUserLogin($email, $password);
+    if ($user) {
+        $tenants = Database::getUserTenants($user['id']);
+        $firstTenant = $tenants[0] ?? null;
+
+        $_SESSION['user_id']       = $user['id'];
+        $_SESSION['user_email']    = $user['email'];
+        $_SESSION['user_name']     = $user['display_name'];
+        $_SESSION['user_role']     = $user['role'];
+        $_SESSION['user_tenants']  = $tenants;
+        $_SESSION['tenant_id']     = $firstTenant['id'] ?? '';
+        $_SESSION['tenant_name']   = $firstTenant['display_name'] ?? '';
+        // Backward-compatible session vars
+        $_SESSION['tenant_email']  = $user['email'];
+        $_SESSION['tenant_role']   = $user['role'];
+        return true;
+    }
+
+    // Fall back to tenants table (legacy auth — transition period)
     $tenant = Database::verifyTenantLogin($email, $password);
     if ($tenant) {
         $_SESSION['tenant_id']    = $tenant['id'];
@@ -65,6 +85,40 @@ function attemptLogin(string $email, string $password): bool {
         $_SESSION['tenant_name']  = $tenant['display_name'];
         $_SESSION['tenant_role']  = $tenant['role'] ?? 'tenant_admin';
         return true;
+    }
+
+    return false;
+}
+
+function getUserId(): int {
+    return (int)($_SESSION['user_id'] ?? 0);
+}
+
+function getUserTenants(): array {
+    return $_SESSION['user_tenants'] ?? [];
+}
+
+function getActiveTenantId(): string {
+    return $_SESSION['tenant_id'] ?? '';
+}
+
+function isBuilder(): bool {
+    return ($_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? '') === 'builder';
+}
+
+function canAccessAnalytics(): bool {
+    $role = $_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? '';
+    return $role === 'superadmin' || $role === 'tenant_admin';
+}
+
+function switchTenant(string $tenantId): bool {
+    $tenants = $_SESSION['user_tenants'] ?? [];
+    foreach ($tenants as $t) {
+        if ($t['id'] === $tenantId) {
+            $_SESSION['tenant_id']   = $t['id'];
+            $_SESSION['tenant_name'] = $t['display_name'];
+            return true;
+        }
     }
     return false;
 }
