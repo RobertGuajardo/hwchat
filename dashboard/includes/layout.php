@@ -368,6 +368,7 @@ function renderNav(string $active = 'overview'): void {
             'communities'   => ['url' => 'communities.php',    'label' => 'COMMUNITIES'],
             'master'        => ['url' => 'master-prompt.php',  'label' => 'MASTER PROMPT'],
             'leads'         => ['url' => 'leads.php',          'label' => 'LEADS'],
+            'users'         => ['url' => 'users.php',          'label' => 'USERS'],
         ];
     } else {
         $tabs = [

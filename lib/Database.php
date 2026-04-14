@@ -614,6 +614,50 @@ class Database
         }
     }
 
+    /**
+     * Get all users with assigned tenant count (superadmin).
+     */
+    public static function getAllUsers(): array
+    {
+        $stmt = self::db()->query('
+            SELECT u.id, u.email, u.display_name, u.role, u.is_active,
+                   u.last_login_at, u.created_at,
+                   (SELECT COUNT(*) FROM user_tenants ut WHERE ut.user_id = u.id) AS tenant_count
+            FROM users u
+            ORDER BY u.role, u.display_name
+        ');
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Update an existing user's fields. If password is non-empty, also update password_hash.
+     */
+    public static function updateUser(int $userId, array $fields): void
+    {
+        $sets = [
+            'display_name = :display_name',
+            'email = :email',
+            'role = :role',
+            'is_active = :is_active',
+        ];
+        $params = [
+            'display_name' => $fields['display_name'],
+            'email'        => $fields['email'],
+            'role'         => $fields['role'],
+            'is_active'    => $fields['is_active'] ? 'true' : 'false',
+            'id'           => $userId,
+        ];
+
+        if (!empty($fields['password'])) {
+            $sets[] = 'password_hash = :password_hash';
+            $params['password_hash'] = password_hash($fields['password'], PASSWORD_BCRYPT);
+        }
+
+        $sql = 'UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = :id';
+        $stmt = self::db()->prepare($sql);
+        $stmt->execute($params);
+    }
+
     // -----------------------------------------------------------------------
     // ANALYTICS METHODS
     // -----------------------------------------------------------------------
