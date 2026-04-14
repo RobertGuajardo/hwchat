@@ -102,28 +102,59 @@ renderNav('analytics');
         <div class="stats-grid">
             <div class="stat-card">
                 <span class="stat-value"><?php echo number_format($summary['total_conversations']); ?></span>
-                <span class="stat-label">CONVERSATIONS</span>
+                <span class="stat-label">CONVERSATIONS <span class="info-tip" data-tip="Total chatbot conversations with at least two messages in the selected period.">&#8505;</span></span>
             </div>
             <div class="stat-card">
                 <span class="stat-value"><?php echo number_format($summary['total_leads']); ?></span>
-                <span class="stat-label">LEADS CAPTURED</span>
+                <span class="stat-label">LEADS CAPTURED <span class="info-tip" data-tip="Conversations where the visitor submitted their contact information.">&#8505;</span></span>
             </div>
             <div class="stat-card">
                 <span class="stat-value"><?php echo number_format($summary['total_tours']); ?></span>
-                <span class="stat-label">TOURS BOOKED</span>
+                <span class="stat-label">TOURS BOOKED <span class="info-tip" data-tip="Conversations where the visitor scheduled a tour through the chatbot.">&#8505;</span></span>
             </div>
             <div class="stat-card">
                 <span class="stat-value"><?php echo $durationFormatted; ?></span>
-                <span class="stat-label">AVG DURATION</span>
+                <span class="stat-label">AVG DURATION <span class="info-tip" data-tip="Average time from first message to last message per conversation.">&#8505;</span></span>
             </div>
             <div class="stat-card">
                 <span class="stat-value"><?php echo $summary['lead_capture_rate']; ?>%</span>
-                <span class="stat-label">LEAD RATE</span>
+                <span class="stat-label">LEAD RATE <span class="info-tip" data-tip="Percentage of conversations that resulted in a captured lead.">&#8505;</span></span>
             </div>
         </div>
 
         <!-- ═══ Charts ═══ -->
         <style>
+        .info-tip {
+            display: inline;
+            cursor: help;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-left: 4px;
+            position: relative;
+        }
+        .info-tip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 6px);
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 400;
+            letter-spacing: normal;
+            text-transform: none;
+            max-width: 280px;
+            width: max-content;
+            white-space: normal;
+            line-height: 1.4;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
         .chart-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -161,31 +192,31 @@ renderNav('analytics');
 
         <div class="chart-grid">
             <div class="chart-card chart-card-wide">
-                <h3>CONVERSATIONS OVER TIME</h3>
+                <h3>CONVERSATIONS OVER TIME <span class="info-tip" data-tip="Daily conversation volume. Spikes often correlate with marketing campaigns or events.">&#8505;</span></h3>
                 <canvas id="chart-conversations"></canvas>
             </div>
             <div class="chart-card">
-                <h3>TOPICS</h3>
+                <h3>TOPICS <span class="info-tip" data-tip="What visitors asked about most. Each conversation can have multiple topics.">&#8505;</span></h3>
                 <canvas id="chart-topics"></canvas>
             </div>
             <div class="chart-card">
-                <h3>BUYER INTENT</h3>
+                <h3>BUYER INTENT <span class="info-tip" data-tip="How serious visitors appeared: browsing, interested, or ready to buy.">&#8505;</span></h3>
                 <canvas id="chart-intent"></canvas>
             </div>
             <div class="chart-card">
-                <h3>SENTIMENT</h3>
+                <h3>SENTIMENT <span class="info-tip" data-tip="Emotional tone of conversations: positive, neutral, or negative.">&#8505;</span></h3>
                 <canvas id="chart-sentiment"></canvas>
             </div>
             <div class="chart-card">
-                <h3>PRICE RANGES</h3>
+                <h3>PRICE RANGES <span class="info-tip" data-tip="Price ranges visitors searched for or asked about.">&#8505;</span></h3>
                 <canvas id="chart-price-ranges"></canvas>
             </div>
             <div class="chart-card">
-                <h3>OBJECTIONS</h3>
+                <h3>OBJECTIONS <span class="info-tip" data-tip="Common concerns or pushback raised by visitors.">&#8505;</span></h3>
                 <canvas id="chart-objections"></canvas>
             </div>
             <div class="chart-card">
-                <h3>BUILDERS MENTIONED</h3>
+                <h3>BUILDERS MENTIONED <span class="info-tip" data-tip="Which builders visitors asked about most frequently.">&#8505;</span></h3>
                 <canvas id="chart-builders"></canvas>
             </div>
         </div>
