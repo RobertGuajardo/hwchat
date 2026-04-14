@@ -1,0 +1,31 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: hwchat-db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: hwchat
+      POSTGRES_USER: hwchat
+      POSTGRES_PASSWORD: hwchat_local
+    volumes:
+      - hwchat-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/migrations
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/00-init.sh
+
+  php:
+    image: php:8.4-cli
+    container_name: hwchat-php
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/hwchat
+    working_dir: /var/www/hwchat
+    depends_on:
+      - db
+    command: ["php", "-S", "0.0.0.0:8000"]
+
+volumes:
+  hwchat-data:

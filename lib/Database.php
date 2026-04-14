@@ -478,4 +478,300 @@ class Database
 
         return true;
     }
+
+    // -----------------------------------------------------------------------
+    // ANALYTICS METHODS
+    // -----------------------------------------------------------------------
+
+    /**
+     * Insert an analytics row for a classified session.
+     * Uses ON CONFLICT to enforce idempotency — re-processing the same session is a no-op.
+     * Returns the row ID, or 0 if the session was already analyzed.
+     */
+    public static function insertAnalytics(array $data): int
+    {
+        $stmt = self::db()->prepare('
+            INSERT INTO chat_analytics (
+                session_id, tenant_id, message_count, user_message_count,
+                intent_level, lead_captured, tour_booked, xo_tool_called,
+                cross_referrals, topics, price_range_min, price_range_max,
+                bedrooms_requested, builders_mentioned, objections,
+                sentiment, summary, session_started_at, session_duration_sec
+            ) VALUES (
+                :session_id, :tenant_id, :message_count, :user_message_count,
+                :intent_level, :lead_captured, :tour_booked, :xo_tool_called,
+                :cross_referrals, :topics, :price_range_min, :price_range_max,
+                :bedrooms_requested, :builders_mentioned, :objections,
+                :sentiment, :summary, :session_started_at, :session_duration_sec
+            )
+            ON CONFLICT (session_id) DO NOTHING
+            RETURNING id
+        ');
+        $stmt->execute([
+            'session_id'          => $data['session_id'],
+            'tenant_id'           => $data['tenant_id'],
+            'message_count'       => $data['message_count'],
+            'user_message_count'  => $data['user_message_count'],
+            'intent_level'        => $data['intent_level'],
+            'lead_captured'       => $data['lead_captured'] ? 'true' : 'false',
+            'tour_booked'         => $data['tour_booked'] ? 'true' : 'false',
+            'xo_tool_called'      => $data['xo_tool_called'] ? 'true' : 'false',
+            'cross_referrals'     => '{' . implode(',', array_map(fn($v) => '"' . str_replace('"', '\\"', $v) . '"', $data['cross_referrals'] ?? [])) . '}',
+            'topics'              => '{' . implode(',', array_map(fn($v) => '"' . str_replace('"', '\\"', $v) . '"', $data['topics'] ?? [])) . '}',
+            'price_range_min'     => $data['price_range_min'] ?? null,
+            'price_range_max'     => $data['price_range_max'] ?? null,
+            'bedrooms_requested'  => $data['bedrooms_requested'] ?? null,
+            'builders_mentioned'  => '{' . implode(',', array_map(fn($v) => '"' . str_replace('"', '\\"', $v) . '"', $data['builders_mentioned'] ?? [])) . '}',
+            'objections'          => '{' . implode(',', array_map(fn($v) => '"' . str_replace('"', '\\"', $v) . '"', $data['objections'] ?? [])) . '}',
+            'sentiment'           => $data['sentiment'],
+            'summary'             => $data['summary'],
+            'session_started_at'  => $data['session_started_at'],
+            'session_duration_sec'=> $data['session_duration_sec'] ?? null,
+        ]);
+        $row = $stmt->fetch();
+        return $row ? (int)$row['id'] : 0;
+    }
+
+    /**
+     * Get aggregated analytics summary for dashboard stat cards.
+     * If $tenantId is null, returns stats across all tenants (superadmin view).
+     */
+    public static function getAnalyticsSummary(?string $tenantId, ?string $after, ?string $before): array
+    {
+        $where = 'WHERE 1=1';
+        $params = [];
+        if ($tenantId) {
+            $where .= ' AND tenant_id = :tenant_id';
+            $params['tenant_id'] = $tenantId;
+        }
+        if ($after) {
+            $where .= ' AND session_started_at >= :after';
+            $params['after'] = $after;
+        }
+        if ($before) {
+            $where .= ' AND session_started_at <= :before';
+            $params['before'] = $before . ' 23:59:59';
+        }
+
+        $stmt = self::db()->prepare("
+            SELECT
+                COUNT(*)::int AS total_conversations,
+                COALESCE(SUM(CASE WHEN lead_captured THEN 1 ELSE 0 END), 0)::int AS total_leads,
+                COALESCE(SUM(CASE WHEN tour_booked THEN 1 ELSE 0 END), 0)::int AS total_tours,
+                COALESCE(AVG(session_duration_sec)::int, 0) AS avg_duration_sec,
+                CASE WHEN COUNT(*) > 0
+                    THEN ROUND(SUM(CASE WHEN lead_captured THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1)
+                    ELSE 0
+                END AS lead_capture_rate
+            FROM chat_analytics
+            $where
+        ");
+        $stmt->execute($params);
+        return $stmt->fetch() ?: [
+            'total_conversations' => 0,
+            'total_leads' => 0,
+            'total_tours' => 0,
+            'avg_duration_sec' => 0,
+            'lead_capture_rate' => 0,
+        ];
+    }
+
+    /**
+     * Get chart data formatted for Chart.js.
+     * $chartType: conversations_over_time, topics, intent, sentiment, price_ranges, objections, builders
+     */
+    public static function getAnalyticsChartData(string $chartType, ?string $tenantId, ?string $after, ?string $before): array
+    {
+        $where = 'WHERE 1=1';
+        $params = [];
+        if ($tenantId) {
+            $where .= ' AND tenant_id = :tenant_id';
+            $params['tenant_id'] = $tenantId;
+        }
+        if ($after) {
+            $where .= ' AND session_started_at >= :after';
+            $params['after'] = $after;
+        }
+        if ($before) {
+            $where .= ' AND session_started_at <= :before';
+            $params['before'] = $before . ' 23:59:59';
+        }
+
+        switch ($chartType) {
+            case 'conversations_over_time':
+                $stmt = self::db()->prepare("
+                    SELECT session_started_at::date AS day, COUNT(*)::int AS count
+                    FROM chat_analytics $where
+                    GROUP BY day ORDER BY day ASC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'day'),
+                    'datasets' => [['label' => 'Conversations', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'topics':
+                $stmt = self::db()->prepare("
+                    SELECT t AS label, COUNT(*)::int AS count
+                    FROM chat_analytics, unnest(topics) AS t $where
+                    GROUP BY t ORDER BY count DESC LIMIT 15
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Topics', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'intent':
+                $stmt = self::db()->prepare("
+                    SELECT intent_level AS label, COUNT(*)::int AS count
+                    FROM chat_analytics $where
+                    GROUP BY intent_level ORDER BY count DESC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Intent', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'sentiment':
+                $stmt = self::db()->prepare("
+                    SELECT sentiment AS label, COUNT(*)::int AS count
+                    FROM chat_analytics $where
+                    GROUP BY sentiment ORDER BY count DESC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Sentiment', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'price_ranges':
+                $stmt = self::db()->prepare("
+                    SELECT
+                        CASE
+                            WHEN price_range_max < 300000 THEN 'Under 300k'
+                            WHEN price_range_min < 400000 AND price_range_max >= 300000 THEN '300k–400k'
+                            WHEN price_range_min < 500000 AND price_range_max >= 400000 THEN '400k–500k'
+                            ELSE '500k+'
+                        END AS label,
+                        COUNT(*)::int AS count
+                    FROM chat_analytics $where
+                        AND price_range_min IS NOT NULL
+                    GROUP BY label ORDER BY count DESC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Price Ranges', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'objections':
+                $stmt = self::db()->prepare("
+                    SELECT o AS label, COUNT(*)::int AS count
+                    FROM chat_analytics, unnest(objections) AS o $where
+                    GROUP BY o ORDER BY count DESC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Objections', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            case 'builders':
+                $stmt = self::db()->prepare("
+                    SELECT b AS label, COUNT(*)::int AS count
+                    FROM chat_analytics, unnest(builders_mentioned) AS b $where
+                    GROUP BY b ORDER BY count DESC LIMIT 15
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return [
+                    'labels' => array_column($rows, 'label'),
+                    'datasets' => [['label' => 'Builders', 'data' => array_map('intval', array_column($rows, 'count'))]],
+                ];
+
+            default:
+                return ['labels' => [], 'datasets' => []];
+        }
+    }
+
+    /**
+     * Export all analytics rows for CSV download.
+     */
+    public static function getAnalyticsExport(?string $tenantId, ?string $after, ?string $before): array
+    {
+        $where = 'WHERE 1=1';
+        $params = [];
+        if ($tenantId) {
+            $where .= ' AND ca.tenant_id = :tenant_id';
+            $params['tenant_id'] = $tenantId;
+        }
+        if ($after) {
+            $where .= ' AND ca.session_started_at >= :after';
+            $params['after'] = $after;
+        }
+        if ($before) {
+            $where .= ' AND ca.session_started_at <= :before';
+            $params['before'] = $before . ' 23:59:59';
+        }
+
+        $stmt = self::db()->prepare("
+            SELECT ca.*, t.display_name AS tenant_name, t.community_name
+            FROM chat_analytics ca
+            JOIN tenants t ON ca.tenant_id = t.id
+            $where
+            ORDER BY ca.session_started_at DESC
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Log an analytics tagger job run.
+     */
+    public static function logAnalyticsRun(int $processed, int $skipped, int $errors, int $durationSec, array $errorDetails = []): void
+    {
+        $stmt = self::db()->prepare('
+            INSERT INTO chat_analytics_log (sessions_processed, sessions_skipped, errors, duration_sec, error_details)
+            VALUES (:processed, :skipped, :errors, :duration, :details)
+        ');
+        $stmt->execute([
+            'processed' => $processed,
+            'skipped'   => $skipped,
+            'errors'    => $errors,
+            'duration'  => $durationSec,
+            'details'   => json_encode($errorDetails),
+        ]);
+    }
+
+    /**
+     * Get sessions that have not been analyzed yet.
+     * If $backfill is false, only returns sessions from the last 24 hours.
+     * Only returns sessions with at least 2 messages.
+     */
+    public static function getUnanalyzedSessions(bool $backfill = false, int $limit = 100): array
+    {
+        $timeFilter = $backfill ? '' : 'AND s.last_active >= NOW() - INTERVAL \'24 hours\'';
+
+        $stmt = self::db()->prepare("
+            SELECT s.id, s.tenant_id, s.started_at, s.last_active, s.message_count
+            FROM sessions s
+            LEFT JOIN chat_analytics ca ON s.id = ca.session_id
+            WHERE ca.id IS NULL
+              AND s.message_count >= 2
+              $timeFilter
+            ORDER BY s.started_at ASC
+            LIMIT :lim
+        ");
+        $stmt->bindValue('lim', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
 }
