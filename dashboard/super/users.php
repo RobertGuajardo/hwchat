@@ -211,27 +211,35 @@ renderNav('users');
             <a href="?action=new" class="btn btn-primary">+ ADD USER</a>
         </div>
 
+        <style>
+        .users-table-wrap { width:100%; overflow-x:auto; }
+        .users-table-wrap table { min-width:100%; width:max-content; }
+        .users-table-wrap td, .users-table-wrap th { font-size:0.85rem; }
+        .users-table-wrap .col-nowrap { white-space:nowrap; }
+        .users-table-wrap .col-actions { white-space:nowrap; width:1%; }
+        </style>
+
         <?php if (empty($users)): ?>
             <div class="empty-state">No users yet. Run migration 019 to migrate existing tenant logins.</div>
         <?php else: ?>
-        <div class="table-wrap">
+        <div class="table-wrap users-table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>NAME</th>
-                        <th>EMAIL</th>
+                        <th class="col-nowrap">NAME</th>
+                        <th class="col-nowrap">EMAIL</th>
                         <th>ROLE</th>
                         <th>STATUS</th>
                         <th class="center">TENANTS</th>
-                        <th>LAST LOGIN</th>
-                        <th>ACTIONS</th>
+                        <th class="col-nowrap">LAST LOGIN</th>
+                        <th class="col-actions">ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($users as $u): ?>
                     <tr>
-                        <td style="font-weight:600;color:var(--text-bright);"><?php echo e($u['display_name']); ?></td>
-                        <td><?php echo e($u['email']); ?></td>
+                        <td class="col-nowrap" style="font-weight:600;color:var(--text-bright);"><?php echo e($u['display_name']); ?></td>
+                        <td class="col-nowrap"><?php echo e($u['email']); ?></td>
                         <td>
                             <?php if ($u['role'] === 'superadmin'): ?>
                                 <span class="badge badge-super">SUPERADMIN</span>
