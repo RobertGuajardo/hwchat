@@ -154,6 +154,12 @@ renderNav('analytics');
             width: 100% !important;
             max-height: 280px;
         }
+        .chart-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 48px 16px;
+            font-size: 13px;
+        }
         .chart-card-wide {
             grid-column: 1 / -1;
         }
@@ -193,15 +199,200 @@ renderNav('analytics');
             </div>
         </div>
 
-        <!-- Chart.js loaded here; chart rendering will be added in the next task -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>
-        // Pass filter params to JS for the chart data API
-        window.analyticsFilters = {
-            tenant: <?php echo json_encode($tenantId); ?>,
-            after:  <?php echo json_encode($after); ?>,
-            before: <?php echo json_encode($before); ?>
-        };
+        (function() {
+            // ─── Theme-aware defaults ───
+            var cs = getComputedStyle(document.documentElement);
+            Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#6B7A94';
+            Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || 'rgba(255,255,255,0.06)';
+
+            var filters = {
+                tenant: <?php echo json_encode($tenantId); ?>,
+                after:  <?php echo json_encode($after); ?>,
+                before: <?php echo json_encode($before); ?>
+            };
+
+            var charts = {};
+
+            // ─── Color palettes ───
+            var barColors = ['#3B7DD8','#5B9BE6','#4A8C5C','#68A97A','#C9A96E','#A78BFA','#f87171',
+                             '#fbbf24','#34d399','#818cf8','#fb923c','#e879f9','#22d3ee','#a3e635','#f472b6'];
+            var intentColors  = { browsing: '#6B7A94', interested: '#3B7DD8', ready_to_buy: '#4A8C5C' };
+            var sentimentColors = { positive: '#4A8C5C', neutral: '#6B7A94', negative: '#C85555' };
+
+            function buildUrl(chartType) {
+                var params = 'chart=' + encodeURIComponent(chartType);
+                if (filters.tenant) params += '&tenant=' + encodeURIComponent(filters.tenant);
+                if (filters.after)  params += '&after='  + encodeURIComponent(filters.after);
+                if (filters.before) params += '&before=' + encodeURIComponent(filters.before);
+                return 'api-analytics.php?' + params;
+            }
+
+            function showEmpty(canvasId) {
+                var canvas = document.getElementById(canvasId);
+                var div = document.createElement('div');
+                div.className = 'chart-empty';
+                div.textContent = 'No data for this period';
+                canvas.parentNode.replaceChild(div, canvas);
+            }
+
+            function hasData(d) {
+                return d && d.labels && d.labels.length > 0;
+            }
+
+            function loadChart(canvasId, chartType, builder) {
+                fetch(buildUrl(chartType))
+                    .then(function(r) { return r.json(); })
+                    .then(function(resp) {
+                        if (!resp.success || !hasData(resp.data)) {
+                            showEmpty(canvasId);
+                            return;
+                        }
+                        if (charts[canvasId]) charts[canvasId].destroy();
+                        charts[canvasId] = builder(canvasId, resp.data);
+                    })
+                    .catch(function() { showEmpty(canvasId); });
+            }
+
+            // ─── Chart builders ───
+
+            loadChart('chart-conversations', 'conversations_over_time', function(id, data) {
+                return new Chart(document.getElementById(id), {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Conversations',
+                            data: data.datasets[0].data,
+                            borderColor: '#3B7DD8',
+                            backgroundColor: 'rgba(59,125,216,0.08)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#3B7DD8'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { precision: 0 } }
+                        }
+                    }
+                });
+            });
+
+            loadChart('chart-topics', 'topics', function(id, data) {
+                return new Chart(document.getElementById(id), {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.datasets[0].data,
+                            backgroundColor: barColors.slice(0, data.labels.length)
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            });
+
+            loadChart('chart-intent', 'intent', function(id, data) {
+                var colors = data.labels.map(function(l) { return intentColors[l] || '#6B7A94'; });
+                return new Chart(document.getElementById(id), {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{ data: data.datasets[0].data, backgroundColor: colors, borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' } }
+                        }
+                    }
+                });
+            });
+
+            loadChart('chart-sentiment', 'sentiment', function(id, data) {
+                var colors = data.labels.map(function(l) { return sentimentColors[l] || '#6B7A94'; });
+                return new Chart(document.getElementById(id), {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{ data: data.datasets[0].data, backgroundColor: colors, borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' } }
+                        }
+                    }
+                });
+            });
+
+            loadChart('chart-price-ranges', 'price_ranges', function(id, data) {
+                return new Chart(document.getElementById(id), {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.datasets[0].data,
+                            backgroundColor: ['#3B7DD8','#5B9BE6','#4A8C5C','#C9A96E']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            });
+
+            loadChart('chart-objections', 'objections', function(id, data) {
+                return new Chart(document.getElementById(id), {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.datasets[0].data,
+                            backgroundColor: '#C85555'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            });
+
+            loadChart('chart-builders', 'builders', function(id, data) {
+                return new Chart(document.getElementById(id), {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.datasets[0].data,
+                            backgroundColor: barColors.slice(0, data.labels.length)
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            });
+
+        })();
         </script>
 
     </main>
