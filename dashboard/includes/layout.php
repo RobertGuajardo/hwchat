@@ -402,6 +402,29 @@ function renderNav(string $active = 'overview'): void {
                 <button onclick="setTheme('dark')" data-theme-btn="dark" title="Dark"
                     style="width:22px;height:22px;border-radius:50%;background:#111111;border:2px solid transparent;cursor:pointer;transition:border-color 0.15s;padding:0;"></button>
             </div>
+            <?php
+            $userTenants = $_SESSION['user_tenants'] ?? [];
+            $switchBase = $inSuperDir ? '../' : '';
+            if (count($userTenants) > 1): ?>
+            <select id="tenant-switcher" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 8px;cursor:pointer;outline:none;letter-spacing:0.03em;">
+                <?php foreach ($userTenants as $ut): ?>
+                    <option value="<?php echo e($ut['id']); ?>" <?php echo ($ut['id'] === ($_SESSION['tenant_id'] ?? '')) ? 'selected' : ''; ?>>
+                        <?php echo e($ut['community_name'] ?: $ut['display_name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <script>
+            document.getElementById('tenant-switcher').addEventListener('change', function() {
+                fetch('<?php echo $switchBase; ?>switch-tenant.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({tenant_id: this.value})
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.success) window.location.reload();
+                });
+            });
+            </script>
+            <?php endif; ?>
             <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-muted);"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
             <a href="<?php echo $inSuperDir ? '../' : ''; ?>logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
