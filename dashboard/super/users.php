@@ -153,7 +153,7 @@ if ($iAmSuper) {
 renderHead($isEdit ? ($isNew ? 'Add User' : 'Edit User') : 'User Management');
 renderNav('users');
 ?>
-    <main class="container" style="max-width:900px;">
+    <main class="container">
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo e($success); ?></div>
         <?php endif; ?>
@@ -287,9 +287,8 @@ renderNav('users');
 
         <style>
         .users-table-wrap { width:100%; overflow-x:auto; }
-        .users-table-wrap table { min-width:100%; width:max-content; }
+        .users-table-wrap table { width:100%; }
         .users-table-wrap td, .users-table-wrap th { font-size:0.85rem; }
-        .users-table-wrap .col-nowrap { white-space:nowrap; }
         .users-table-wrap .col-actions { white-space:nowrap; width:1%; }
         </style>
 
@@ -300,20 +299,20 @@ renderNav('users');
             <table>
                 <thead>
                     <tr>
-                        <th class="col-nowrap">NAME</th>
-                        <th class="col-nowrap">EMAIL</th>
+                        <th>NAME</th>
+                        <th>EMAIL</th>
                         <th>ROLE</th>
                         <th>STATUS</th>
                         <th class="center">TENANTS</th>
-                        <th class="col-nowrap">LAST LOGIN</th>
+                        <th>LAST LOGIN</th>
                         <th class="col-actions">ACTIONS</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($users as $u): ?>
                     <tr>
-                        <td class="col-nowrap" style="font-weight:600;color:var(--text-bright);"><?php echo e($u['display_name']); ?></td>
-                        <td class="col-nowrap"><?php echo e($u['email']); ?></td>
+                        <td style="font-weight:600;color:var(--text-bright);"><?php echo e($u['display_name']); ?></td>
+                        <td><?php echo e($u['email']); ?></td>
                         <td>
                             <?php if ($u['role'] === 'superadmin'): ?>
                                 <span class="badge badge-super">SUPERADMIN</span>
