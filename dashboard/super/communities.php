@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
-requireSuperAdmin();
+require_once __DIR__ . '/../../lib/regions.php';
+requireMinRole('regional_admin');
 
 $db = Database::db();
 $success = '';
@@ -44,6 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $communities = Database::getCommunities();
+
+// Regional admin: filter to their region
+if (isRegionalAdmin()) {
+    $scopedIds = getScopedTenantIds();
+    $communities = array_values(array_filter($communities, fn($c) => in_array($c['id'], $scopedIds)));
+}
 $crossRefRaw = Database::getGlobalSetting('cross_referral_groups');
 $generatedText = Database::generateDirectoryText();
 

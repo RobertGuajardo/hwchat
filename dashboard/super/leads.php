@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../../lib/regions.php';
-requireSuperAdmin();
+requireMinRole('regional_admin');
 
 $db = Database::db();
 $scopeAll = ($_SESSION['scope_type'] ?? 'all') === 'all';

@@ -6,7 +6,7 @@ require_once __DIR__ . '/includes/layout.php';
 $loginError = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email'], $_POST['password'])) {
     if (attemptLogin($_POST['email'], $_POST['password'])) {
-        $dest = isSuperAdmin() ? 'super/index.php' : 'index.php';
+        $dest = (isSuperAdmin() || isRegionalAdmin()) ? 'super/index.php' : 'index.php';
         header("Location: $dest");
         exit;
     }

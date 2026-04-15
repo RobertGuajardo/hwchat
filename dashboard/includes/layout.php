@@ -365,32 +365,27 @@ function renderNav(string $active = 'overview'): void {
     $inSuperDir = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'super';
 
     // ─── Role-based nav tabs ───
-    if ($isSuper && $inSuperDir) {
+    // Superadmin and regional_admin always get their full admin nav
+    $superPrefix = $inSuperDir ? '' : 'super/';
+    if ($isSuper) {
         $tabs = [
-            'overview'      => ['url' => 'index.php',          'label' => 'OVERVIEW'],
-            'tenants'       => ['url' => 'tenants.php',        'label' => 'TENANTS'],
-            'communities'   => ['url' => 'communities.php',    'label' => 'COMMUNITIES'],
-            'master'        => ['url' => 'master-prompt.php',  'label' => 'MASTER PROMPT'],
-            'leads'         => ['url' => 'leads.php',          'label' => 'LEADS'],
-            'analytics'     => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
-            'users'         => ['url' => 'users.php',          'label' => 'USERS'],
+            'overview'      => ['url' => $superPrefix . 'index.php',          'label' => 'OVERVIEW'],
+            'tenants'       => ['url' => $superPrefix . 'tenants.php',        'label' => 'TENANTS'],
+            'communities'   => ['url' => $superPrefix . 'communities.php',    'label' => 'COMMUNITIES'],
+            'master'        => ['url' => $superPrefix . 'master-prompt.php',  'label' => 'MASTER PROMPT'],
+            'leads'         => ['url' => $superPrefix . 'leads.php',          'label' => 'LEADS'],
+            'analytics'     => ['url' => $superPrefix . 'analytics.php',      'label' => 'ANALYTICS'],
+            'users'         => ['url' => $superPrefix . 'users.php',          'label' => 'USERS'],
         ];
-    } elseif ($isRegAdmin && $inSuperDir) {
+    } elseif ($isRegAdmin) {
         $tabs = [
-            'overview'       => ['url' => 'index.php',          'label' => 'OVERVIEW'],
-            'tenants'        => ['url' => 'tenants.php',        'label' => 'TENANTS'],
-            'communities'    => ['url' => 'communities.php',    'label' => 'COMMUNITIES'],
-            'tenant_prompts' => ['url' => 'tenant-prompts.php', 'label' => 'TENANT PROMPTS'],
-            'leads'          => ['url' => 'leads.php',          'label' => 'LEADS'],
-            'analytics'      => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
-            'users'          => ['url' => 'users.php',          'label' => 'USERS'],
-        ];
-    } elseif ($isRegAdmin && !$inSuperDir) {
-        $tabs = [
-            'overview'  => ['url' => 'index.php',      'label' => 'OVERVIEW'],
-            'leads'     => ['url' => 'leads.php',      'label' => 'LEADS'],
-            'analytics' => ['url' => 'analytics.php',  'label' => 'ANALYTICS'],
-            'bookings'  => ['url' => 'bookings.php',   'label' => 'BOOKINGS'],
+            'overview'       => ['url' => $superPrefix . 'index.php',          'label' => 'OVERVIEW'],
+            'tenants'        => ['url' => $superPrefix . 'tenants.php',        'label' => 'TENANTS'],
+            'communities'    => ['url' => $superPrefix . 'communities.php',    'label' => 'COMMUNITIES'],
+            'tenant_prompts' => ['url' => $superPrefix . 'tenant-prompts.php', 'label' => 'TENANT PROMPTS'],
+            'leads'          => ['url' => $superPrefix . 'leads.php',          'label' => 'LEADS'],
+            'analytics'      => ['url' => $superPrefix . 'analytics.php',      'label' => 'ANALYTICS'],
+            'users'          => ['url' => $superPrefix . 'users.php',          'label' => 'USERS'],
         ];
     } elseif ($isBldr) {
         $tabs = [

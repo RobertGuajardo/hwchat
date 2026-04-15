@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
-requireSuperAdmin();
+require_once __DIR__ . '/../../lib/regions.php';
+requireMinRole('regional_admin');
 
 // Date range filter
 $range = $_GET['range'] ?? '30';
@@ -13,11 +14,27 @@ if ($range === 'custom' && !empty($_GET['after'])) {
     $after = date('Y-m-d', strtotime("-{$range} days"));
 }
 
-// Aggregate stats (all tenants)
-$stats = getStats(null, $after, $before);
-
-// Per-tenant breakdown
+// Per-tenant breakdown (scoped after fetch)
 $tenantStats = getAllTenantStats($after, $before);
+
+// Regional admin: filter to their region
+if (isRegionalAdmin()) {
+    $scopedIds = getScopedTenantIds();
+    $tenantStats = array_values(array_filter($tenantStats, fn($t) => in_array($t['id'], $scopedIds)));
+}
+
+// Compute aggregate stats from the scoped tenant breakdown
+$stats = [
+    'total_sessions'  => array_sum(array_column($tenantStats, 'sessions')),
+    'total_messages'  => array_sum(array_column($tenantStats, 'messages')),
+    'total_leads'     => array_sum(array_column($tenantStats, 'leads')),
+    'conversion_rate' => 0,
+    'avg_messages'    => 0,
+];
+if ($stats['total_sessions'] > 0) {
+    $stats['conversion_rate'] = round(($stats['total_leads'] / $stats['total_sessions']) * 100, 1);
+    $stats['avg_messages'] = round($stats['total_messages'] / $stats['total_sessions'], 1);
+}
 
 renderHead('Admin Overview');
 renderNav('overview');

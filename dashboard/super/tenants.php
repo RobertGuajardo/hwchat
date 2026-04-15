@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
-requireSuperAdmin();
+requireMinRole('regional_admin');
 
 $db = Database::db();
 $success = '';
@@ -63,7 +63,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$tenants = Database::getAllTenants();
+// Load tenants — regional admin scoped to their region
+if (isRegionalAdmin()) {
+    $myRegion = getUserRegion();
+    $stmt = $db->prepare("
+        SELECT id, display_name, email, community_name, community_type,
+               community_location, is_active, role, region, created_at
+        FROM tenants WHERE region = :region
+        ORDER BY community_type, display_name
+    ");
+    $stmt->execute(['region' => $myRegion]);
+    $tenants = $stmt->fetchAll();
+} else {
+    $tenants = Database::getAllTenants();
+}
 
 renderHead('Manage Tenants');
 renderNav('tenants');
