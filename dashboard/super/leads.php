@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
+require_once __DIR__ . '/../../lib/regions.php';
 requireSuperAdmin();
 
 $db = Database::db();
+$scopeAll = ($_SESSION['scope_type'] ?? 'all') === 'all';
 
-// Filters
-$filterTenant = $_GET['tenant'] ?? '';
+// Date filters
 $range = $_GET['range'] ?? '30';
 $after = null; $before = null;
 if ($range === 'custom' && !empty($_GET['after'])) {
@@ -16,13 +17,11 @@ if ($range === 'custom' && !empty($_GET['after'])) {
     $after = date('Y-m-d', strtotime("-{$range} days"));
 }
 
-// Build query
-$where = ' WHERE 1=1';
-$params = [];
-if ($filterTenant) {
-    $where .= ' AND l.tenant_id = :tid';
-    $params['tid'] = $filterTenant;
-}
+// Build scope filter
+$scope = buildScopeWhereClause('l');
+
+$where = ' WHERE 1=1' . $scope['clause'];
+$params = $scope['params'];
 if ($after) { $where .= ' AND l.created_at >= :after'; $params['after'] = $after; }
 if ($before) { $where .= ' AND l.created_at <= :before'; $params['before'] = $before . ' 23:59:59'; }
 
@@ -31,7 +30,8 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 30;
 $offset = ($page - 1) * $perPage;
 
-$stmt = $db->prepare("SELECT COUNT(*) FROM leads l $where");
+$countSql = "SELECT COUNT(*) FROM leads l $where";
+$stmt = $db->prepare($countSql);
 $stmt->execute($params);
 $totalRows = (int) $stmt->fetchColumn();
 $totalPages = max(1, ceil($totalRows / $perPage));
@@ -51,15 +51,11 @@ $stmt->bindValue('off', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $leads = $stmt->fetchAll();
 
-// Tenant list for filter dropdown
-$stmt = $db->query("SELECT id, community_name, display_name FROM tenants WHERE role = 'tenant_admin' ORDER BY display_name");
-$tenantList = $stmt->fetchAll();
-
 renderHead('All Leads');
 renderNav('leads');
 ?>
     <main class="container">
-        <!-- Filters -->
+        <!-- Date Filters -->
         <form method="GET" class="filter-bar">
             <label class="filter-label">PERIOD</label>
             <div class="filter-pills">
@@ -67,16 +63,6 @@ renderNav('leads');
                     <button type="submit" name="range" value="<?php echo $val; ?>" class="pill <?php echo $range === (string)$val ? 'active' : ''; ?>"><?php echo $label; ?></button>
                 <?php endforeach; ?>
             </div>
-            <label class="filter-label" style="margin-left:16px;">COMMUNITY</label>
-            <select name="tenant" class="form-select" style="width:auto;padding:6px 10px;font-size:11px;" onchange="this.form.submit()">
-                <option value="">All Communities</option>
-                <?php foreach ($tenantList as $tl): ?>
-                    <option value="<?php echo e($tl['id']); ?>" <?php echo $filterTenant === $tl['id'] ? 'selected' : ''; ?>>
-                        <?php echo e($tl['community_name'] ?: $tl['display_name']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <input type="hidden" name="range" value="<?php echo e($range); ?>">
         </form>
 
         <div class="action-bar">
@@ -91,7 +77,7 @@ renderNav('leads');
                 <thead>
                     <tr>
                         <th>DATE</th>
-                        <th>COMMUNITY</th>
+                        <?php if ($scopeAll): ?><th>COMMUNITY</th><?php endif; ?>
                         <th>NAME</th>
                         <th>EMAIL</th>
                         <th>PHONE</th>
@@ -103,9 +89,11 @@ renderNav('leads');
                     <?php foreach ($leads as $l): ?>
                     <tr>
                         <td style="white-space:nowrap;"><?php echo e(date('M j, g:ia', strtotime($l['created_at']))); ?></td>
+                        <?php if ($scopeAll): ?>
                         <td>
                             <span class="badge badge-type"><?php echo e(strtoupper($l['community_name'] ?: $l['tenant_display'])); ?></span>
                         </td>
+                        <?php endif; ?>
                         <td><?php echo e($l['name'] ?? '—'); ?></td>
                         <td><?php if (!empty($l['email'])): ?><a href="mailto:<?php echo e($l['email']); ?>"><?php echo e($l['email']); ?></a><?php else: ?>—<?php endif; ?></td>
                         <td><?php if (!empty($l['phone'])): ?><a href="tel:<?php echo e($l['phone']); ?>"><?php echo e($l['phone']); ?></a><?php else: ?>—<?php endif; ?></td>
@@ -129,15 +117,13 @@ renderNav('leads');
 
         <?php if ($totalPages > 1): ?>
         <div class="pagination">
-            <?php
-            $qs = http_build_query(array_filter(['range' => $range, 'tenant' => $filterTenant]));
-            ?>
+            <?php $qs = http_build_query(array_filter(['range' => $range])); ?>
             <?php if ($page > 1): ?>
-                <a href="?<?php echo $qs; ?>&page=<?php echo $page - 1; ?>" class="btn btn-sm">← PREV</a>
+                <a href="?<?php echo $qs; ?>&page=<?php echo $page - 1; ?>" class="btn btn-sm">&larr; PREV</a>
             <?php endif; ?>
             <span class="page-info">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
             <?php if ($page < $totalPages): ?>
-                <a href="?<?php echo $qs; ?>&page=<?php echo $page + 1; ?>" class="btn btn-sm">NEXT →</a>
+                <a href="?<?php echo $qs; ?>&page=<?php echo $page + 1; ?>" class="btn btn-sm">NEXT &rarr;</a>
             <?php endif; ?>
         </div>
         <?php endif; ?>
