@@ -3,6 +3,7 @@
  * Shared layout functions for the HWChat dashboard.
  * Keeps the design system consistent across all pages.
  */
+require_once __DIR__ . '/../../lib/regions.php';
 
 function renderHead(string $title): void {
 ?>
@@ -392,7 +393,7 @@ function renderNav(string $active = 'overview'): void {
             <?php if ($isSuper): ?>
                 <span style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:#C9A96E;border:1px solid rgba(201,169,110,0.4);padding:2px 8px;letter-spacing:0.08em;">SUPER</span>
             <?php endif; ?>
-            <h1><?php echo e(strtoupper(getTenantName())); ?></h1>
+            <h1><?php echo e(strtoupper($isSuper ? getScopeLabel() : getTenantName())); ?></h1>
         </div>
         <div class="topbar-right">
             <?php if ($isSuper && !$inSuperDir): ?>
@@ -410,9 +411,37 @@ function renderNav(string $active = 'overview'): void {
                     style="width:22px;height:22px;border-radius:50%;background:#111111;border:2px solid transparent;cursor:pointer;transition:border-color 0.15s;padding:0;"></button>
             </div>
             <?php
-            $userTenants = $_SESSION['user_tenants'] ?? [];
             $switchBase = $inSuperDir ? '../' : '';
-            if (count($userTenants) > 1): ?>
+            if ($isSuper):
+                $scopeType  = $_SESSION['scope_type'] ?? 'all';
+                $scopeValue = $_SESSION['scope_value'] ?? null;
+                $scopeTenants = getScopedTenantList();
+            ?>
+            <select id="scope-switcher" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 8px;cursor:pointer;outline:none;letter-spacing:0.03em;">
+                <option value="all" <?php echo $scopeType === 'all' ? 'selected' : ''; ?>>All Communities</option>
+                <?php foreach ($scopeTenants as $st): ?>
+                    <option value="<?php echo e($st['id']); ?>" <?php echo ($scopeType === 'tenant' && $scopeValue === $st['id']) ? 'selected' : ''; ?>>
+                        <?php echo e($st['display_name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <script>
+            document.getElementById('scope-switcher').addEventListener('change', function() {
+                var val = this.value;
+                var scopeType = val === 'all' ? 'all' : 'tenant';
+                var scopeValue = val === 'all' ? null : val;
+                fetch('<?php echo $switchBase; ?>api/set-scope.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({scope_type: scopeType, scope_value: scopeValue})
+                }).then(function(r) { return r.json(); }).then(function(d) {
+                    if (d.success) window.location.reload();
+                });
+            });
+            </script>
+            <?php else:
+                $userTenants = $_SESSION['user_tenants'] ?? [];
+                if (count($userTenants) > 1): ?>
             <select id="tenant-switcher" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 8px;cursor:pointer;outline:none;letter-spacing:0.03em;">
                 <?php foreach ($userTenants as $ut): ?>
                     <option value="<?php echo e($ut['id']); ?>" <?php echo ($ut['id'] === ($_SESSION['tenant_id'] ?? '')) ? 'selected' : ''; ?>>
@@ -431,7 +460,8 @@ function renderNav(string $active = 'overview'): void {
                 });
             });
             </script>
-            <?php endif; ?>
+            <?php endif;
+            endif; ?>
             <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-muted);"><?php echo e($_SESSION['tenant_email'] ?? ''); ?></span>
             <a href="<?php echo $inSuperDir ? '../' : ''; ?>logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
