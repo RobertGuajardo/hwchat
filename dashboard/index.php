@@ -41,6 +41,7 @@ if (!isAuthenticated()) {
 }
 
 // ─── Authenticated: show dashboard ───
+if (isBuilder()) { header('Location: bookings.php'); exit; }
 $tenantId = getTenantId();
 
 // Date range filter

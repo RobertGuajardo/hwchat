@@ -2,6 +2,7 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/includes/layout.php';
 requireAuth();
+if (isBuilder()) { header('Location: bookings.php'); exit; }
 
 $db = Database::db();
 $tenantId = getTenantId();
