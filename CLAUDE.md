@@ -6,7 +6,7 @@ HWChat is a multi-tenant AI chatbot platform built in plain PHP with PostgreSQL 
 
 This is a personal freelance project by Robert Guajardo. HWChat is the Hillwood-specific fork of the RobChat platform. The codebase is intentionally simple — no frameworks, no build tools beyond the widget bundler, no ORM.
 
-Currently adding: conversation analytics (nightly LLM tagging, dashboard with charts, CSV export) and multi-user accounts with role-based access.
+Currently adding: role-based access expansion (superuser / regional admin / tenant) and conversation analytics.
 
 ## Production Environment
 
@@ -35,30 +35,31 @@ hwchat/
 ├── lib/                    # Core classes
 │   ├── Database.php        # Static PDO singleton — all DB queries
 │   ├── LLMClassifier.php   # Analytics LLM classification helper
-│   ├── regions.php         # REGIONS constant + scope helpers (scope selector feature)
+│   ├── regions.php         # REGIONS constant + scope helpers (role-aware)
 │   ├── CecilianXO.php      # Cecilian XO property API client (homes/homesites)
 │   └── Embeddings.php      # OpenAI text-embedding-3-small → pgvector
 ├── dashboard/              # Admin panel (PHP + HTML)
-│   ├── auth.php            # Auth helpers, login, session management
-│   ├── includes/layout.php # Shared layout (renderHead, renderNav, renderFooter)
-│   ├── index.php           # Overview page
+│   ├── auth.php            # Auth helpers, login, session management, role checks
+│   ├── includes/layout.php # Shared layout — role-based nav and dropdown
+│   ├── index.php           # Overview page (scoped by role)
 │   ├── session.php         # View single conversation
 │   ├── settings.php        # Tenant settings (XO, HubSpot, branding)
 │   ├── knowledge-base.php  # KB management + website scraper
 │   ├── leads.php           # Lead viewer
 │   ├── bookings.php        # Booking viewer
-│   ├── analytics.php       # Analytics dashboard
+│   ├── analytics.php       # Analytics dashboard (scoped by role)
 │   ├── api.php             # Dashboard AJAX handler
-│   ├── api-analytics.php   # Analytics chart data endpoint
-│   ├── api/set-scope.php   # Scope switch endpoint (scope selector feature)
-│   ├── export-analytics.php # CSV export
+│   ├── api-analytics.php   # Analytics chart data endpoint (scoped by role)
+│   ├── api/set-scope.php   # Scope switch endpoint
+│   ├── export-analytics.php # CSV export (scoped by role)
 │   ├── switch-tenant.php   # Multi-tenant switcher
+│   ├── tenant-prompts.php  # Read-only tenant prompts (regional_admin)
 │   └── super/              # Superuser admin
-│       ├── tenants.php     # Multi-tenant management
+│       ├── tenants.php     # Multi-tenant management (scoped by role)
 │       ├── tenant-edit.php # Individual tenant config (includes region dropdown)
-│       ├── communities.php # Community directory
-│       ├── master-prompt.php # Global system prompt
-│       └── leads.php       # Cross-tenant lead viewer (scope-aware)
+│       ├── communities.php # Community directory (scoped by role)
+│       ├── master-prompt.php # Global system prompt (superadmin only)
+│       └── leads.php       # Cross-tenant lead viewer (scoped by role)
 ├── widget/
 │   └── robchat.js          # Bundled/minified chat widget (Shadow DOM, vanilla JS)
 ├── scripts/                # Maintenance & scraping
@@ -66,7 +67,7 @@ hwchat/
 │   ├── scrape-wp-universal.php  # WordPress site scraper
 │   ├── backfill-embeddings.php  # Regenerate embeddings
 │   └── scrape-all.sh            # Batch scrape all communities
-├── migrations/             # PostgreSQL schema (001–020, applied in order)
+├── migrations/             # PostgreSQL schema (001–021, applied in order)
 ├── config.php              # LIVE CREDENTIALS — gitignored, never committed
 ├── config.example.php      # Template for config.php
 ├── .htaccess               # Apache routing
@@ -93,7 +94,7 @@ hwchat/
 - `community_type` field: `community`, `parent`, `realtor`, `kiosk`, `standard`
 - Parent-child linking via `parent_tenant_id` (kiosk → community → parent)
 - Per-tenant: system prompt, LLM keys, branding colors, allowed CORS origins, XO config, HubSpot config
-- `region` column (nullable) ties community tenants to a geographic region (DFW / Houston / Austin) — used for analytics grouping, not navigation. NULL region = excluded from scope system.
+- `region` column (nullable) ties community tenants to a geographic region (DFW / Houston / Austin) — used for analytics grouping and regional admin scoping. NULL region = excluded from scope system.
 
 ### Widget Embedding
 ```html
@@ -106,7 +107,7 @@ Widget uses Shadow DOM for style isolation. All theming comes from tenant config
 - **PostgreSQL 16** with **pgvector** for embeddings
 - Tables: `tenants`, `sessions`, `messages`, `leads`, `bookings`, `kb_entries`, `kb_sources`, `availability_rules`, `availability_overrides`, `rate_limits`, `builders`, `chat_analytics`, `chat_analytics_log`, `users`, `user_tenants`, `global_settings`
 - **Important:** Tenants table PK is `id` (not `tenant_id`). Other tables use `tenant_id` as the FK.
-- Migrations in `/migrations/` (001–019 applied, 020 next available)
+- Migrations in `/migrations/` (001–020 applied, 021 next available)
 - `Database.php` is a static class — no ORM, all raw SQL via PDO
 
 ### External Integrations
@@ -140,7 +141,7 @@ ALTER TABLE ...;
 CREATE TABLE ...;
 INSERT INTO ... ON CONFLICT ... DO NOTHING;
 ```
-- Next available number: 020
+- Next available number: 021
 - Use `IF NOT EXISTS` for CREATE TABLE, `ON CONFLICT DO NOTHING` for INSERT
 - Include the run command in the header comment
 
@@ -213,30 +214,41 @@ require_once __DIR__ . '/bootstrap.php';
 - JS widget: `HWChat` namespace, CSS classes prefixed `rc-` (legacy from RobChat)
 - Migration files: `NNN_description.sql`
 
-## Auth Model (Transitioning)
+## Auth Model
 
-**Current (legacy):** Login authenticates against `tenants.email` + `tenants.password_hash`. Session stores `tenant_id`, `tenant_email`, `tenant_name`, `tenant_role`.
-
-**New (in progress):** Login authenticates against `users.email` + `users.password_hash`. Session stores `user_id`, `user_email`, `user_name`, `user_role`, `user_tenants[]`, plus `tenant_id`/`tenant_name` for the active tenant.
-
-**During transition:** `attemptLogin()` tries the users table first, falls back to the tenants table. Both paths set the same backward-compatible session vars so existing pages don't break.
-
-### Roles
-| Role | Scope | Access |
-|------|-------|--------|
-| superadmin | All tenants | Everything — dashboard, analytics, settings, user management |
-| tenant_admin | Assigned tenants | Dashboard, analytics, leads, bookings, settings, knowledge base |
-| builder | Assigned tenants | Calendar and bookings only |
+### Roles (4 tiers)
+| Role | Slug | Scope | Access |
+|------|------|-------|--------|
+| Superuser | `superadmin` | All tenants, all regions | Everything — all pages, all data, user management |
+| Regional Admin | `regional_admin` | Tenants in their assigned region | Region-scoped pages, read-only tenant prompts, no master prompt |
+| Tenant | `tenant_admin` | Assigned tenants only | Their community's dashboard, analytics, leads, bookings, settings, KB |
+| Builder | `builder` | Assigned tenants only | Calendar, bookings, and analytics only |
 
 ### Key Auth Functions (dashboard/auth.php)
 - `requireAuth()` — redirect to login if not authenticated
 - `requireSuperAdmin()` — redirect if not superadmin
+- `requireMinRole(string $minRole)` — redirect if below minimum role level
 - `isSuperAdmin()` — check role
-- `canAccessAnalytics()` — true for superadmin and tenant_admin, false for builder
+- `isRegionalAdmin()` — check role
+- `getUserRegion()` — returns region slug for regional_admin, null for others
+- `canAccessAnalytics()` — true for superadmin, regional_admin, tenant_admin, and builder
 - `isBuilder()` — true for builder role
+- `canAccessPage(string $page)` — checks role matrix for page access
 - `getUserTenants()` — array of tenants the logged-in user can access
 - `getActiveTenantId()` — currently selected tenant
-- `switchTenant($tenantId)` — change active tenant (validates against user's assigned tenants)
+- `switchTenant($tenantId)` — change active tenant (validates against user's scope)
+
+### Login Session Variables
+```php
+$_SESSION['user_id']       // int
+$_SESSION['user_email']    // string
+$_SESSION['user_name']     // string
+$_SESSION['user_role']     // 'superadmin' | 'regional_admin' | 'tenant_admin' | 'builder'
+$_SESSION['user_region']   // 'dfw' | 'houston' | 'austin' | null
+$_SESSION['user_tenants']  // array of tenant IDs
+$_SESSION['scope_type']    // 'all' | 'tenant'
+$_SESSION['scope_value']   // null | '{tenant id}'
+```
 
 ## Security Rules
 
@@ -250,8 +262,9 @@ require_once __DIR__ . '/bootstrap.php';
 - **Never** use MD5, SHA1, or plain text for passwords — always `password_hash($password, PASSWORD_BCRYPT)`
 - **Never** trust client-side role claims — validate `$_SESSION['user_role']` server-side on every request
 - **Never** expose `global_settings` API keys in frontend responses
-- **Never** allow builder role to access analytics, settings, leads, or knowledge base pages/endpoints
-- **Never** let `switchTenant()` accept a tenant ID that's not in the user's assigned tenant list
+- **Never** allow builder role to access leads, settings, knowledge base, users, or tenants pages/endpoints
+- **Never** allow regional_admin to access master prompt or data outside their region
+- **Never** let `switchTenant()` accept a tenant ID that's not in the user's allowed scope
 - **Never** commit `config.php` — it contains database credentials and API keys
 - **Never** modify robchat.js directly — it's a bundled/minified output
 - **Never** run migrations out of order — they depend on each other
@@ -264,10 +277,10 @@ require_once __DIR__ . '/bootstrap.php';
 - Validate auth and role at the top of every dashboard page and API endpoint
 - Use `e()` (htmlspecialchars) when outputting user data in HTML
 - Use `getIpHash()` for rate limiting — never store raw IPs
-- Scope database queries by tenant_id for non-superadmin users
+- Scope database queries using `buildScopeWhereClause()` — it handles role-based filtering automatically
 - Use `ON CONFLICT` for idempotent inserts (especially in migrations and the analytics tagger)
 - Hash IPs with SHA-256 before storing (`hash('sha256', $ip)`)
-- Check `canAccessAnalytics()` on every analytics page AND every analytics API endpoint — both
+- Check page access with `canAccessPage()` or role-specific guards on every page
 
 ### API Key Handling
 - LLM API keys for the analytics job are stored in `global_settings` table (not config.php)
@@ -289,99 +302,63 @@ Harvest, Treeline, Pecan Square, Union Park, Wolf Ranch, Valencia, Pomona, Lilya
 
 Non-community tenants (excluded from scope system): demo_001 (Acme AI Assistant), hw_superadmin (Hillwood Admin).
 
-## Scope Selector & Region Infrastructure
+## Scope Selector & Region Infrastructure (COMPLETE)
 
-**Spec:** `specs/SPEC-REGION-SCOPING.md`
-**Tasks:** `tasks/TASKS-REGION-SCOPING.md`
-**Migration:** 020
+**Migration:** 020 (applied)
+
+The superadmin topbar dropdown has an "All Communities" option that shows aggregate data across all community tenants. Dropdown is a flat list — no region grouping. Region column on tenants table ties each community to DFW / Houston / Austin for analytics filtering. Tenants with NULL region are excluded from the scope system.
+
+**Key files:** `lib/regions.php`, `dashboard/api/set-scope.php`, `dashboard/includes/layout.php`
+
+**Session:** `$_SESSION['scope_type']` = `all` | `tenant`, `$_SESSION['scope_value']` = null | tenant id
+
+**Code pattern:** Always use `buildScopeWhereClause()` from `lib/regions.php` for scope filtering.
+
+## Role-Based Access Expansion (IN PROGRESS)
+
+**Spec:** `specs/SPEC-ROLE-EXPANSION.md`
+**Tasks:** `tasks/TASKS-ROLE-EXPANSION.md`
+**Migration:** 021
 
 ### What This Feature Does
 
-Adds an "All Communities" option to the superadmin topbar dropdown so aggregate data can be viewed across all community tenants. The dropdown stays flat — no region grouping in navigation. Separately, a `region` column on the `tenants` table ties each community to a geographic region (DFW / Houston / Austin) as infrastructure for the Phase 2 analytics dashboard, where region will be a filter/sort dimension.
+Adds `regional_admin` role between superadmin and tenant_admin. Every dashboard page is scoped by role. Regional admins see only their region's data. The Tenant View toggle is removed — replaced by real role-based access.
 
-### Two Separate Concerns
+### Role Matrix
 
-1. **Dropdown & scope** — "All Communities" + flat list of individual tenants (only those with non-null region). Two scope types: `all` and `tenant`. No region-level scoping in the dropdown.
-2. **Region data layer** — `region` column on `tenants` (nullable), REGIONS constant, region dropdown on tenant-edit. This exists for analytics, not for the topbar.
+| Page | superadmin | regional_admin | tenant_admin | builder |
+|------|-----------|----------------|-------------|---------|
+| Overview | All tenants | Region tenants | Own tenant | No access |
+| Tenants | All | Region only | No access | No access |
+| Communities | All | Region only | No access | No access |
+| Master Prompt | Edit | No access | No access | No access |
+| Tenant Prompts | All (read) | Region (read) | No access | No access |
+| Leads | All + Community col | Region + Community col | Own tenant | No access |
+| Analytics | All/Region/Tenant | Region/Tenant | Own tenant | Own tenant |
+| Users | All | Region only | No access | No access |
+| Settings | All tenants | Region tenants | Own tenant | No access |
+| Knowledge Base | All tenants | Region tenants | Own tenant | No access |
+| Bookings | All tenants | Region tenants | Own tenant | Own tenant |
 
-### Region Mapping (confirmed from DB)
+### Dropdown by Role
 
-| id | display_name | region |
-|----|-------------|--------|
-| hw_harvest | Harvest by Hillwood | dfw |
-| hw_treeline | Treeline by Hillwood | dfw |
-| hw_pecan_square | Pecan Square by Hillwood | dfw |
-| hw_union_park | Union Park by Hillwood | dfw |
-| hw_lilyana | Lilyana by Hillwood | dfw |
-| hw_landmark | Landmark by Hillwood | dfw |
-| hw_ramble | Ramble by Hillwood | dfw |
-| hw_parent | Hillwood Communities | dfw |
-| hw_realtors | Hillwood Loves Realtors | dfw |
-| hw_pomona | Pomona by Hillwood | houston |
-| hw_legacy | Legacy by Hillwood | houston |
-| hw_valencia | Valencia by Hillwood | houston |
-| hw_wolf_ranch | Wolf Ranch by Hillwood | austin |
-| hw_melina | Melina by Hillwood | austin |
-| demo_001 | Acme AI Assistant | NULL |
-| hw_superadmin | Hillwood Admin | NULL |
+- **Superadmin:** "All Communities" + all 14 community tenants
+- **Regional Admin:** "All [Region Name]" + tenants in their region
+- **Tenant Admin:** their assigned tenant(s)
+- **Builder:** no dropdown
 
-### Nullable Region Logic
+### buildScopeWhereClause() is role-aware
 
-- `region IS NOT NULL` = community tenant, participates in scope system, appears in dropdown and aggregates
-- `region IS NULL` = excluded from everything — dropdown, aggregate views, analytics
-- "All Communities" scope means `WHERE tenant_id IN (SELECT id FROM tenants WHERE region IS NOT NULL)` — not literally all rows
-
-### Key Files (Scope Selector)
-
-| File | Purpose |
-|------|---------|
-| `lib/regions.php` | REGIONS constant, scope helpers (`getScopedTenantIds`, `buildScopeWhereClause`, `getScopeLabel`) |
-| `migrations/020-add-region-column.sql` | Adds `region TEXT DEFAULT NULL` to tenants table with CHECK constraint |
-| `dashboard/includes/layout.php` | "All Communities" added to topbar dropdown + header label fix |
-| `dashboard/api/set-scope.php` | Endpoint to update `$_SESSION` scope on dropdown selection |
-| `dashboard/super/tenant-edit.php` | Region dropdown added to tenant settings |
-| `dashboard/super/leads.php` | Scope-aware filtering + Community column when viewing all |
-
-### Session Variables (Scope)
-
-```php
-$_SESSION['scope_type']  = 'all' | 'tenant';
-$_SESSION['scope_value'] = null | '{tenant id}';  // e.g. 'hw_harvest'
-```
-
-Superadmin login defaults to `scope_type = 'all'`.
-
-### Code Patterns for Scope
-
-Always use `buildScopeWhereClause()` for scope filtering — never build scope SQL manually:
-
-```php
-require_once __DIR__ . '/../lib/regions.php';
-$scope = buildScopeWhereClause('l');  // 'l' = table alias for leads
-$sql = "SELECT l.* FROM leads l WHERE 1=1 {$scope['clause']} ORDER BY l.created_at DESC";
-$stmt = $pdo->prepare($sql);
-$stmt->execute($scope['params']);
-```
-
-Note: `buildScopeWhereClause()` targets the `tenant_id` FK column on the aliased table (not the tenants table `id` column directly).
-
-### Constraints (Scope Selector)
-
-- Region column has a CHECK constraint: `region IN ('dfw', 'houston', 'austin')` — NULL is allowed (passes CHECK by default in PostgreSQL)
-- Adding a new region requires: (1) ALTER the CHECK constraint, (2) add to REGIONS constant
-- Scope dropdown is superadmin-only — tenant_admin users never see it
-- Tenant View mode requires a specific tenant selected (cannot impersonate "all")
-- Region does NOT affect the dropdown or scope system — it is metadata for analytics only
-
-### Known Gotcha
-
-The superadmin header in `layout.php` topbar-left currently shows the first tenant's name instead of a generic label. Task C.2 fixes this to show `getScopeLabel()` — either "Hillwood AI Chatbot" (all) or the tenant display name.
+The scope helper automatically restricts based on role and region:
+- Superadmin "all" → WHERE region IS NOT NULL
+- Regional admin "all" → WHERE tenant_id IN (tenants in their region)
+- Tenant admin → WHERE tenant_id IN (assigned tenants)
 
 ## Current Feature Work
 
-- **Feature Spec:** SPEC-REGION-SCOPING.md (Scope Selector & Region Infrastructure)
-- **Task Decomposition:** TASKS-REGION-SCOPING.md
-- **Current Phase:** Starting Phase A (Database & Region Infrastructure)
+- **Feature Spec:** SPEC-ROLE-EXPANSION.md (Role-Based Access)
+- **Task Decomposition:** TASKS-ROLE-EXPANSION.md
+- **Current Phase:** Starting Phase A (Database & Auth Foundation)
 
 ## Testing Approach
 
