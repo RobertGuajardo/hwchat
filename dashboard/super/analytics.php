@@ -2,9 +2,12 @@
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../../lib/regions.php';
-requireSuperAdmin();
+requireMinRole('regional_admin');
 
 $db = Database::db();
+$iAmSuper    = isSuperAdmin();
+$iAmRegAdmin = isRegionalAdmin();
+$myRegion    = getUserRegion();
 
 // ─── Period filter ───
 $period = $_GET['period'] ?? 'month';
@@ -30,24 +33,80 @@ if ($period === 'custom' && !empty($_GET['after'])) {
     }
 }
 
-// ─── Tenant filter (scope-aware) ───
-$scopeType = $_SESSION['scope_type'] ?? 'all';
-$tenantId  = $scopeType === 'tenant' ? ($_SESSION['scope_value'] ?? null) : null;
+// ─── Region + tenant filters ───
+$filterRegion = $_GET['region'] ?? '';
+$filterTenant = $_GET['tenant'] ?? '';
+
+// Determine the effective tenant ID for queries
+$tenantId = null;
+if ($filterTenant) {
+    // Specific tenant selected — validate regional_admin can see it
+    if ($iAmRegAdmin) {
+        $stmt = $db->prepare('SELECT id FROM tenants WHERE id = :id AND region = :region');
+        $stmt->execute(['id' => $filterTenant, 'region' => $myRegion]);
+        $tenantId = $stmt->fetch() ? $filterTenant : null;
+    } else {
+        $tenantId = $filterTenant;
+    }
+} elseif ($filterRegion && $iAmSuper) {
+    // Region filter — tenantId stays null, region passed to API
+    $tenantId = null;
+} else {
+    // "All" scope — tenantId null, scoping handled by API
+    $tenantId = null;
+}
+
+// For regional_admin: force region to their region
+$effectiveRegion = $iAmRegAdmin ? $myRegion : $filterRegion;
 
 // Build query string for links
 $qs = http_build_query(array_filter([
     'period' => $period,
+    'region' => $effectiveRegion,
+    'tenant' => $filterTenant,
     'after'  => $period === 'custom' ? $after : null,
     'before' => $period === 'custom' ? $before : null,
 ]));
 
 // ─── Summary data ───
-$summary = Database::getAnalyticsSummary($tenantId, $after, $before);
+if ($tenantId) {
+    $summary = Database::getAnalyticsSummary($tenantId, $after, $before);
+} else {
+    // Region or all-communities scoped summary via direct query
+    $sumWhere = 'WHERE 1=1';
+    $sumParams = [];
+    if ($effectiveRegion) {
+        $sumWhere .= ' AND tenant_id IN (SELECT id FROM tenants WHERE region = :region)';
+        $sumParams['region'] = $effectiveRegion;
+    } else {
+        $sumWhere .= ' AND tenant_id IN (SELECT id FROM tenants WHERE region IS NOT NULL)';
+    }
+    if ($after) { $sumWhere .= ' AND session_started_at >= :after'; $sumParams['after'] = $after; }
+    if ($before) { $sumWhere .= ' AND session_started_at <= :before'; $sumParams['before'] = $before . ' 23:59:59'; }
+
+    $stmt = $db->prepare("
+        SELECT
+            COUNT(*)::int AS total_conversations,
+            COALESCE(SUM(CASE WHEN lead_captured THEN 1 ELSE 0 END), 0)::int AS total_leads,
+            COALESCE(SUM(CASE WHEN tour_booked THEN 1 ELSE 0 END), 0)::int AS total_tours,
+            COALESCE(AVG(session_duration_sec)::int, 0) AS avg_duration_sec,
+            CASE WHEN COUNT(*) > 0
+                THEN ROUND(SUM(CASE WHEN lead_captured THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1)
+                ELSE 0
+            END AS lead_capture_rate
+        FROM chat_analytics {$sumWhere}
+    ");
+    $stmt->execute($sumParams);
+    $summary = $stmt->fetch() ?: ['total_conversations' => 0, 'total_leads' => 0, 'total_tours' => 0, 'avg_duration_sec' => 0, 'lead_capture_rate' => 0];
+}
 
 // Format duration
 $durMin = (int)floor(($summary['avg_duration_sec'] ?? 0) / 60);
 $durSec = ($summary['avg_duration_sec'] ?? 0) % 60;
 $durationFormatted = $durMin > 0 ? "{$durMin}m {$durSec}s" : "{$durSec}s";
+
+// Tenant list for dropdown (scoped by role)
+$dropdownTenants = getScopedTenantList();
 
 renderHead('Analytics');
 renderNav('analytics');
@@ -55,15 +114,45 @@ renderNav('analytics');
     <main class="container">
 
         <!-- ═══ Filters ═══ -->
-        <form method="GET" class="filter-bar" style="margin-bottom:16px;">
+        <form method="GET" class="filter-bar" style="margin-bottom:8px;">
             <label class="filter-label">PERIOD</label>
             <div class="filter-pills">
                 <?php foreach (['today' => 'TODAY', 'week' => 'WEEK', 'month' => 'MONTH', 'quarter' => 'QTR', 'year' => 'YEAR', 'all' => 'ALL'] as $val => $label): ?>
                     <button type="submit" name="period" value="<?php echo $val; ?>" class="pill <?php echo $period === $val ? 'active' : ''; ?>"><?php echo $label; ?></button>
                 <?php endforeach; ?>
             </div>
-
+            <?php if ($filterRegion): ?><input type="hidden" name="region" value="<?php echo e($filterRegion); ?>"><?php endif; ?>
+            <?php if ($filterTenant): ?><input type="hidden" name="tenant" value="<?php echo e($filterTenant); ?>"><?php endif; ?>
             <input type="hidden" name="period" value="<?php echo e($period); ?>">
+        </form>
+
+        <!-- Region + Tenant filters -->
+        <form method="GET" class="filter-bar" style="margin-bottom:16px;">
+            <input type="hidden" name="period" value="<?php echo e($period); ?>">
+            <?php if ($period === 'custom' && $after): ?>
+                <input type="hidden" name="after" value="<?php echo e($after); ?>">
+                <input type="hidden" name="before" value="<?php echo e($before); ?>">
+            <?php endif; ?>
+
+            <?php if ($iAmSuper): ?>
+            <label class="filter-label">REGION</label>
+            <div class="filter-pills">
+                <button type="submit" name="region" value="" class="pill <?php echo !$filterRegion && !$filterTenant ? 'active' : ''; ?>">ALL</button>
+                <?php foreach (REGIONS as $key => $label): ?>
+                    <button type="submit" name="region" value="<?php echo e($key); ?>" class="pill <?php echo $filterRegion === $key && !$filterTenant ? 'active' : ''; ?>"><?php echo e(strtoupper($key)); ?></button>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <label class="filter-label" style="margin-left:16px;">COMMUNITY</label>
+            <select name="tenant" class="form-select" style="width:auto;padding:6px 10px;font-size:11px;" onchange="this.form.submit()">
+                <option value=""><?php echo e($iAmRegAdmin ? ('All ' . (REGIONS[$myRegion] ?? 'Region')) : ($filterRegion ? 'All ' . strtoupper($filterRegion) : 'All Communities')); ?></option>
+                <?php foreach ($dropdownTenants as $dt): ?>
+                    <option value="<?php echo e($dt['id']); ?>" <?php echo $filterTenant === $dt['id'] ? 'selected' : ''; ?>>
+                        <?php echo e($dt['display_name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </form>
 
         <!-- Custom date range -->
@@ -77,6 +166,8 @@ renderNav('analytics');
                 <input type="date" name="before" class="form-input" style="width:160px;padding:6px 10px;font-size:12px;" value="<?php echo e($period === 'custom' ? ($before ?? '') : ''); ?>">
             </div>
             <input type="hidden" name="period" value="custom">
+            <?php if ($filterRegion): ?><input type="hidden" name="region" value="<?php echo e($filterRegion); ?>"><?php endif; ?>
+            <?php if ($filterTenant): ?><input type="hidden" name="tenant" value="<?php echo e($filterTenant); ?>"><?php endif; ?>
             <button type="submit" class="btn btn-sm">APPLY</button>
             <div style="margin-left:auto;">
                 <a href="../export-analytics.php?<?php echo e($qs); ?>" class="btn btn-sm">EXPORT CSV</a>
@@ -215,6 +306,7 @@ renderNav('analytics');
 
             var filters = {
                 tenant: <?php echo json_encode($tenantId); ?>,
+                region: <?php echo json_encode($effectiveRegion ?: null); ?>,
                 after:  <?php echo json_encode($after); ?>,
                 before: <?php echo json_encode($before); ?>
             };
@@ -229,6 +321,7 @@ renderNav('analytics');
             function buildUrl(chartType) {
                 var params = 'chart=' + encodeURIComponent(chartType);
                 if (filters.tenant) params += '&tenant=' + encodeURIComponent(filters.tenant);
+                if (filters.region) params += '&region=' + encodeURIComponent(filters.region);
                 if (filters.after)  params += '&after='  + encodeURIComponent(filters.after);
                 if (filters.before) params += '&before=' + encodeURIComponent(filters.before);
                 return '../api-analytics.php?' + params;
