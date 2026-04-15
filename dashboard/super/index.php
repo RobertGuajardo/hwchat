@@ -14,13 +14,67 @@ if ($range === 'custom' && !empty($_GET['after'])) {
     $after = date('Y-m-d', strtotime("-{$range} days"));
 }
 
-// Per-tenant breakdown (scoped after fetch)
-$tenantStats = getAllTenantStats($after, $before);
+$db = Database::db();
 
-// Regional admin: filter to their region
-if (isRegionalAdmin()) {
-    $scopedIds = getScopedTenantIds();
-    $tenantStats = array_values(array_filter($tenantStats, fn($t) => in_array($t['id'], $scopedIds)));
+// Build scope-aware tenant filter using buildScopeWhereClause
+// This targets the tenants table (alias 't'), filtering by t.tenant_id — but tenants PK is 'id'.
+// So we use getScopedTenantIds() to get the list and build an IN clause.
+$scopedIds = getScopedTenantIds();
+
+if (empty($scopedIds)) {
+    $tenantStats = [];
+} else {
+    $ph = [];
+    $scopeParams = [];
+    foreach ($scopedIds as $i => $id) {
+        $key = "stid_{$i}";
+        $ph[] = ":{$key}";
+        $scopeParams[$key] = $id;
+    }
+    $inClause = implode(',', $ph);
+
+    $dateWhere = '';
+    $dateParams = [];
+    if ($after) { $dateWhere .= ' AND s.started_at >= :after'; $dateParams['after'] = $after; }
+    if ($before) { $dateWhere .= ' AND s.started_at <= :before'; $dateParams['before'] = $before . ' 23:59:59'; }
+
+    $leadDateWhere = '';
+    $leadParams = [];
+    if ($after) { $leadDateWhere .= ' AND l.created_at >= :lead_after'; $leadParams['lead_after'] = $after; }
+    if ($before) { $leadDateWhere .= ' AND l.created_at <= :lead_before'; $leadParams['lead_before'] = $before . ' 23:59:59'; }
+
+    $sql = "
+        SELECT
+            t.id, t.display_name, t.community_name, t.community_type, t.is_active, t.email,
+            COALESCE(sess.cnt, 0) AS sessions,
+            COALESCE(msg.cnt, 0) AS messages,
+            COALESCE(ld.cnt, 0) AS leads,
+            sess.latest
+        FROM tenants t
+        LEFT JOIN (
+            SELECT tenant_id, COUNT(*) AS cnt, MAX(started_at) AS latest
+            FROM sessions s WHERE 1=1 {$dateWhere}
+            GROUP BY tenant_id
+        ) sess ON sess.tenant_id = t.id
+        LEFT JOIN (
+            SELECT s.tenant_id, COUNT(*) AS cnt
+            FROM messages m JOIN sessions s ON m.session_id = s.id
+            WHERE 1=1 {$dateWhere}
+            GROUP BY s.tenant_id
+        ) msg ON msg.tenant_id = t.id
+        LEFT JOIN (
+            SELECT tenant_id, COUNT(*) AS cnt
+            FROM leads l WHERE 1=1 {$leadDateWhere}
+            GROUP BY tenant_id
+        ) ld ON ld.tenant_id = t.id
+        WHERE t.id IN ({$inClause})
+        ORDER BY COALESCE(sess.cnt, 0) DESC, t.display_name
+    ";
+
+    $allParams = array_merge($scopeParams, $dateParams, $leadParams);
+    $stmt = $db->prepare($sql);
+    $stmt->execute($allParams);
+    $tenantStats = $stmt->fetchAll();
 }
 
 // Compute aggregate stats from the scoped tenant breakdown
