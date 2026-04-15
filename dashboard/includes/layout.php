@@ -359,9 +359,12 @@ function renderHead(string $title): void {
 }
 
 function renderNav(string $active = 'overview'): void {
-    $isSuper = isSuperAdmin();
+    $isSuper    = isSuperAdmin();
+    $isRegAdmin = isRegionalAdmin();
+    $isBldr     = isBuilder();
     $inSuperDir = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'super';
 
+    // ─── Role-based nav tabs ───
     if ($isSuper && $inSuperDir) {
         $tabs = [
             'overview'      => ['url' => 'index.php',          'label' => 'OVERVIEW'],
@@ -372,39 +375,52 @@ function renderNav(string $active = 'overview'): void {
             'analytics'     => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
             'users'         => ['url' => 'users.php',          'label' => 'USERS'],
         ];
+    } elseif ($isRegAdmin && $inSuperDir) {
+        $tabs = [
+            'overview'       => ['url' => 'index.php',          'label' => 'OVERVIEW'],
+            'tenants'        => ['url' => 'tenants.php',        'label' => 'TENANTS'],
+            'communities'    => ['url' => 'communities.php',    'label' => 'COMMUNITIES'],
+            'tenant_prompts' => ['url' => 'tenant-prompts.php', 'label' => 'TENANT PROMPTS'],
+            'leads'          => ['url' => 'leads.php',          'label' => 'LEADS'],
+            'analytics'      => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
+            'users'          => ['url' => 'users.php',          'label' => 'USERS'],
+        ];
+    } elseif ($isBldr) {
+        $tabs = [
+            'bookings'  => ['url' => 'bookings.php',  'label' => 'BOOKINGS'],
+            'analytics' => ['url' => 'analytics.php',  'label' => 'ANALYTICS'],
+        ];
     } else {
+        // tenant_admin (and fallback)
         $tabs = [
             'overview'  => ['url' => 'index.php',           'label' => 'OVERVIEW'],
             'leads'     => ['url' => 'leads.php',           'label' => 'LEADS'],
-        ];
-        if (canAccessAnalytics()) {
-            $tabs['analytics'] = ['url' => 'analytics.php', 'label' => 'ANALYTICS'];
-        }
-        $tabs += [
+            'analytics' => ['url' => 'analytics.php',       'label' => 'ANALYTICS'],
             'bookings'  => ['url' => 'bookings.php',        'label' => 'BOOKINGS'],
             'knowledge' => ['url' => 'knowledge-base.php',  'label' => 'KNOWLEDGE'],
             'settings'  => ['url' => 'settings.php',        'label' => 'SETTINGS'],
         ];
     }
+
+    // Scope dropdown data
+    $showScopeDropdown = ($isSuper || $isRegAdmin) && !$isBldr;
+    $scopeType    = $_SESSION['scope_type'] ?? 'all';
+    $scopeValue   = $_SESSION['scope_value'] ?? null;
+    $scopeTenants = $showScopeDropdown ? getScopedTenantList() : [];
+    $scopeAllLabel = getScopeLabel();
+    $switchBase   = $inSuperDir ? '../' : '';
 ?>
     <header class="topbar">
         <div class="topbar-left">
             <span class="topbar-stamp">HW</span>
             <?php if ($isSuper): ?>
                 <span style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:#C9A96E;border:1px solid rgba(201,169,110,0.4);padding:2px 8px;letter-spacing:0.08em;">SUPER</span>
+            <?php elseif ($isRegAdmin): ?>
+                <span style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--blue);border:1px solid rgba(59,125,216,0.4);padding:2px 8px;letter-spacing:0.08em;">REGIONAL</span>
             <?php endif; ?>
-            <h1><?php echo e(strtoupper($isSuper ? getScopeLabel() : getTenantName())); ?></h1>
+            <h1><?php echo e(strtoupper(($isSuper || $isRegAdmin) ? getScopeLabel() : getTenantName())); ?></h1>
         </div>
         <div class="topbar-right">
-            <?php if ($isSuper && !$inSuperDir): ?>
-                <a href="super/index.php" class="btn btn-sm" style="color:var(--gold);border-color:rgba(201,169,110,0.3);" onclick="fetch('api/set-scope.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({restore_admin_scope:true})});">ADMIN PANEL</a>
-            <?php elseif ($isSuper && $inSuperDir): ?>
-                <?php if (($_SESSION['scope_type'] ?? 'all') === 'all'): ?>
-                <a href="#" class="btn btn-sm btn-ghost" onclick="document.getElementById('pickTenantModal').style.display='flex';return false;">TENANT VIEW</a>
-                <?php else: ?>
-                <a href="#" class="btn btn-sm btn-ghost" onclick="fetch('../api/set-scope.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope_type:'tenant',scope_value:'<?php echo e($_SESSION['scope_value']); ?>',save_admin_scope:true})}).then(function(r){return r.json()}).then(function(d){if(d.success)window.location.href='../index.php'});return false;">TENANT VIEW</a>
-                <?php endif; ?>
-            <?php endif; ?>
             <!-- Theme Switcher -->
             <div style="display:flex;gap:4px;align-items:center;margin:0 4px;" title="Switch theme">
                 <button onclick="setTheme('hillwood')" data-theme-btn="hillwood" title="Hillwood"
@@ -414,15 +430,9 @@ function renderNav(string $active = 'overview'): void {
                 <button onclick="setTheme('dark')" data-theme-btn="dark" title="Dark"
                     style="width:22px;height:22px;border-radius:50%;background:#111111;border:2px solid transparent;cursor:pointer;transition:border-color 0.15s;padding:0;"></button>
             </div>
-            <?php
-            $switchBase = $inSuperDir ? '../' : '';
-            if ($isSuper):
-                $scopeType  = $_SESSION['scope_type'] ?? 'all';
-                $scopeValue = $_SESSION['scope_value'] ?? null;
-                $scopeTenants = getScopedTenantList();
-            ?>
+            <?php if ($showScopeDropdown): ?>
             <select id="scope-switcher" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 8px;cursor:pointer;outline:none;letter-spacing:0.03em;">
-                <option value="all" <?php echo $scopeType === 'all' ? 'selected' : ''; ?>>All Communities</option>
+                <option value="all" <?php echo $scopeType === 'all' ? 'selected' : ''; ?>><?php echo e($isRegAdmin ? ('All ' . (REGIONS[$_SESSION['user_region'] ?? ''] ?? 'Region')) : 'All Communities'); ?></option>
                 <?php foreach ($scopeTenants as $st): ?>
                     <option value="<?php echo e($st['id']); ?>" <?php echo ($scopeType === 'tenant' && $scopeValue === $st['id']) ? 'selected' : ''; ?>>
                         <?php echo e($st['display_name']); ?>
@@ -445,7 +455,7 @@ function renderNav(string $active = 'overview'): void {
             </script>
             <?php else:
                 $userTenants = $_SESSION['user_tenants'] ?? [];
-                if (count($userTenants) > 1): ?>
+                if (!$isBldr && count($userTenants) > 1): ?>
             <select id="tenant-switcher" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:5px 8px;cursor:pointer;outline:none;letter-spacing:0.03em;">
                 <?php foreach ($userTenants as $ut): ?>
                     <option value="<?php echo e($ut['id']); ?>" <?php echo ($ut['id'] === ($_SESSION['tenant_id'] ?? '')) ? 'selected' : ''; ?>>
@@ -470,36 +480,6 @@ function renderNav(string $active = 'overview'): void {
             <a href="<?php echo $inSuperDir ? '../' : ''; ?>logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
     </header>
-    <?php if ($isSuper && $inSuperDir && ($_SESSION['scope_type'] ?? 'all') === 'all'): ?>
-    <!-- Pick Tenant modal — shown when entering Tenant View from "All Communities" scope -->
-    <div id="pickTenantModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;">
-        <div style="background:var(--bg-topbar);border:1px solid var(--border-light);padding:32px;width:100%;max-width:400px;">
-            <h3 style="margin-bottom:8px;">SELECT A COMMUNITY</h3>
-            <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Choose a community to view in Tenant View mode.</p>
-            <select id="pickTenantSelect" class="form-select" style="width:100%;margin-bottom:16px;">
-                <?php foreach (getScopedTenantList() as $pt): ?>
-                    <option value="<?php echo e($pt['id']); ?>"><?php echo e($pt['display_name']); ?></option>
-                <?php endforeach; ?>
-            </select>
-            <div style="display:flex;gap:8px;">
-                <button class="btn btn-primary" onclick="enterTenantView()">GO</button>
-                <button class="btn" onclick="document.getElementById('pickTenantModal').style.display='none'">CANCEL</button>
-            </div>
-        </div>
-    </div>
-    <script>
-    function enterTenantView() {
-        var tid = document.getElementById('pickTenantSelect').value;
-        fetch('../api/set-scope.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({scope_type: 'tenant', scope_value: tid, save_admin_scope: true})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.success) window.location.href = '../index.php';
-        });
-    }
-    </script>
-    <?php endif; ?>
     <script>
     function setTheme(t) {
         document.documentElement.setAttribute('data-theme', t);
