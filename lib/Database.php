@@ -490,7 +490,7 @@ class Database
     public static function verifyUserLogin(string $email, string $password): ?array
     {
         $stmt = self::db()->prepare('
-            SELECT id, email, password_hash, display_name, role
+            SELECT id, email, password_hash, display_name, role, region
             FROM users WHERE email = :email AND is_active = TRUE
         ');
         $stmt->execute(['email' => $email]);

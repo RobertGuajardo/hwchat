@@ -68,14 +68,15 @@ function attemptLogin(string $email, string $password): bool {
         $_SESSION['user_email']    = $user['email'];
         $_SESSION['user_name']     = $user['display_name'];
         $_SESSION['user_role']     = $user['role'];
+        $_SESSION['user_region']   = $user['region'] ?? null;
         $_SESSION['user_tenants']  = $tenants;
         $_SESSION['tenant_id']     = $firstTenant['id'] ?? '';
         $_SESSION['tenant_name']   = $firstTenant['display_name'] ?? '';
         // Backward-compatible session vars
         $_SESSION['tenant_email']  = $user['email'];
         $_SESSION['tenant_role']   = $user['role'];
-        // Superadmin defaults to "All Communities" scope
-        if ($user['role'] === 'superadmin') {
+        // Scope defaults by role
+        if ($user['role'] === 'superadmin' || $user['role'] === 'regional_admin') {
             $_SESSION['scope_type']  = 'all';
             $_SESSION['scope_value'] = null;
         }
@@ -113,7 +114,7 @@ function isBuilder(): bool {
 
 function canAccessAnalytics(): bool {
     $role = $_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? '';
-    return $role === 'superadmin' || $role === 'tenant_admin';
+    return in_array($role, ['superadmin', 'regional_admin', 'tenant_admin', 'builder']);
 }
 
 function switchTenant(string $tenantId): bool {
@@ -126,6 +127,54 @@ function switchTenant(string $tenantId): bool {
         }
     }
     return false;
+}
+
+function isRegionalAdmin(): bool {
+    return ($_SESSION['user_role'] ?? '') === 'regional_admin';
+}
+
+function getUserRegion(): ?string {
+    return $_SESSION['user_region'] ?? null;
+}
+
+/**
+ * Role hierarchy: superadmin > regional_admin > tenant_admin > builder.
+ * Redirects if the user's role is below the minimum required.
+ */
+function requireMinRole(string $minRole): void {
+    requireAuth();
+    $hierarchy = ['superadmin' => 4, 'regional_admin' => 3, 'tenant_admin' => 2, 'builder' => 1];
+    $userRole = $_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? 'builder';
+    $userLevel = $hierarchy[$userRole] ?? 0;
+    $minLevel  = $hierarchy[$minRole] ?? 0;
+    if ($userLevel < $minLevel) {
+        $dashUrl = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'super' ? '../index.php' : 'index.php';
+        header("Location: $dashUrl");
+        exit;
+    }
+}
+
+/**
+ * Check if the current role can access a given page.
+ * Page names match the role matrix in SPEC-ROLE-EXPANSION.md.
+ */
+function canAccessPage(string $page): bool {
+    $role = $_SESSION['user_role'] ?? $_SESSION['tenant_role'] ?? 'builder';
+    $matrix = [
+        'overview'       => ['superadmin', 'regional_admin', 'tenant_admin'],
+        'tenants'        => ['superadmin', 'regional_admin'],
+        'communities'    => ['superadmin', 'regional_admin'],
+        'master_prompt'  => ['superadmin'],
+        'tenant_prompts' => ['regional_admin'],
+        'leads'          => ['superadmin', 'regional_admin', 'tenant_admin'],
+        'analytics'      => ['superadmin', 'regional_admin', 'tenant_admin', 'builder'],
+        'users'          => ['superadmin', 'regional_admin'],
+        'settings'       => ['superadmin', 'regional_admin', 'tenant_admin'],
+        'knowledge'      => ['superadmin', 'regional_admin', 'tenant_admin'],
+        'bookings'       => ['superadmin', 'regional_admin', 'tenant_admin', 'builder'],
+    ];
+    $allowed = $matrix[$page] ?? [];
+    return in_array($role, $allowed);
 }
 
 /**
