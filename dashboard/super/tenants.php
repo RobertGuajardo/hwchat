@@ -12,6 +12,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $targetId = $_POST['tenant_id'] ?? '';
 
+    // Regional admin: validate target tenant is in their region for all actions
+    if (isRegionalAdmin() && $targetId) {
+        $stmt = $db->prepare('SELECT id FROM tenants WHERE id = :id AND region = :region');
+        $stmt->execute(['id' => $targetId, 'region' => getUserRegion()]);
+        if (!$stmt->fetch()) {
+            $error = 'Access denied — tenant is not in your region.';
+            $action = ''; // block the action
+        }
+    }
+
     if ($action === 'reset_password' && $targetId) {
         $newPass = $_POST['new_password'] ?? '';
         if (strlen($newPass) < 8) {
@@ -28,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = $targetId . ($newState ? ' activated.' : ' deactivated.');
     }
 
-    if ($action === 'create_tenant') {
+    if ($action === 'create_tenant' && isSuperAdmin()) {
         $newId = trim($_POST['new_id'] ?? '');
         $newEmail = trim($_POST['new_email'] ?? '');
         $newPass = $_POST['new_password'] ?? '';
@@ -91,7 +101,7 @@ renderNav('tenants');
 
         <div class="action-bar">
             <h2>TENANTS <span style="color:var(--text-muted);font-size:14px;">(<?php echo count($tenants); ?>)</span></h2>
-            <button class="btn btn-primary" onclick="document.getElementById('createModal').style.display='flex'">+ NEW TENANT</button>
+            <?php if (isSuperAdmin()): ?><button class="btn btn-primary" onclick="document.getElementById('createModal').style.display='flex'">+ NEW TENANT</button><?php endif; ?>
         </div>
 
         <div class="table-wrap">

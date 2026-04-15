@@ -20,7 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $districts = $_POST['school_district'] ?? [];
         $taglines = $_POST['community_tagline'] ?? [];
 
+        // Regional admin: only allow editing communities in their region
+        $allowedIds = isRegionalAdmin() ? getScopedTenantIds() : null;
+
         foreach ($ids as $i => $id) {
+            if ($allowedIds !== null && !in_array($id, $allowedIds)) continue;
             Database::updateCommunityFields($id, [
                 'community_name'     => trim($names[$i] ?? ''),
                 'community_location' => trim($locations[$i] ?? ''),
@@ -32,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Community directory updated.';
     }
 
-    if ($action === 'save_crossref') {
+    if ($action === 'save_crossref' && isSuperAdmin()) {
         $crossRefJson = trim($_POST['cross_referral_groups'] ?? '{}');
         $decoded = json_decode($crossRefJson, true);
         if ($decoded === null && $crossRefJson !== '{}') {
@@ -118,6 +122,7 @@ renderNav('communities');
             <button type="submit" class="btn btn-primary" style="padding:10px 24px;">SAVE COMMUNITY INFO</button>
         </form>
 
+        <?php if (isSuperAdmin()): ?>
         <!-- Cross-Referral Groups -->
         <div style="margin-top:48px;">
             <div class="form-section">
@@ -155,6 +160,7 @@ renderNav('communities');
                 </div>
             </div>
         </div>
+        <?php endif; ?>
     </main>
 
     <script>
