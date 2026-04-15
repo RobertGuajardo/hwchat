@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
 require_once __DIR__ . '/../../lib/regions.php';
-requireSuperAdmin();
+requireMinRole('regional_admin');
 
 $db = Database::db();
 $tenantId = $_GET['id'] ?? '';
@@ -16,6 +16,12 @@ $stmt = $db->prepare('SELECT * FROM tenants WHERE id = :id');
 $stmt->execute(['id' => $tenantId]);
 $tenant = $stmt->fetch();
 if (!$tenant) { header('Location: tenants.php'); exit; }
+
+// Regional admin can only edit tenants in their region
+if (isRegionalAdmin() && ($tenant['region'] ?? null) !== getUserRegion()) {
+    header('Location: tenants.php');
+    exit;
+}
 
 // Decode JSONB
 $tenant['quick_replies']   = json_decode($tenant['quick_replies'] ?? '[]', true) ?: [];

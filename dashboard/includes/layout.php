@@ -385,6 +385,13 @@ function renderNav(string $active = 'overview'): void {
             'analytics'      => ['url' => 'analytics.php',      'label' => 'ANALYTICS'],
             'users'          => ['url' => 'users.php',          'label' => 'USERS'],
         ];
+    } elseif ($isRegAdmin && !$inSuperDir) {
+        $tabs = [
+            'overview'  => ['url' => 'index.php',      'label' => 'OVERVIEW'],
+            'leads'     => ['url' => 'leads.php',      'label' => 'LEADS'],
+            'analytics' => ['url' => 'analytics.php',  'label' => 'ANALYTICS'],
+            'bookings'  => ['url' => 'bookings.php',   'label' => 'BOOKINGS'],
+        ];
     } elseif ($isBldr) {
         $tabs = [
             'bookings'  => ['url' => 'bookings.php',  'label' => 'BOOKINGS'],

@@ -545,7 +545,7 @@ class Database
     public static function getUserById(int $userId): ?array
     {
         $stmt = self::db()->prepare('
-            SELECT id, email, display_name, role, is_active, last_login_at, created_at, updated_at
+            SELECT id, email, display_name, role, region, is_active, last_login_at, created_at, updated_at
             FROM users WHERE id = :id AND is_active = TRUE
         ');
         $stmt->execute(['id' => $userId]);
@@ -555,22 +555,23 @@ class Database
     /**
      * Create a new user with tenant assignments. Uses a transaction for atomicity.
      */
-    public static function createUser(string $email, string $password, string $displayName, string $role, array $tenantIds): int
+    public static function createUser(string $email, string $password, string $displayName, string $role, array $tenantIds, ?string $region = null): int
     {
         $db = self::db();
         $db->beginTransaction();
         try {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $stmt = $db->prepare('
-                INSERT INTO users (email, password_hash, display_name, role)
-                VALUES (:email, :hash, :name, :role)
+                INSERT INTO users (email, password_hash, display_name, role, region)
+                VALUES (:email, :hash, :name, :role, :region)
                 RETURNING id
             ');
             $stmt->execute([
-                'email' => $email,
-                'hash'  => $hash,
-                'name'  => $displayName,
-                'role'  => $role,
+                'email'  => $email,
+                'hash'   => $hash,
+                'name'   => $displayName,
+                'role'   => $role,
+                'region' => $region,
             ]);
             $userId = (int)$stmt->fetch()['id'];
 
@@ -620,7 +621,7 @@ class Database
     public static function getAllUsers(): array
     {
         $stmt = self::db()->query('
-            SELECT u.id, u.email, u.display_name, u.role, u.is_active,
+            SELECT u.id, u.email, u.display_name, u.role, u.region, u.is_active,
                    u.last_login_at, u.created_at,
                    (SELECT COUNT(*) FROM user_tenants ut WHERE ut.user_id = u.id) AS tenant_count
             FROM users u
@@ -638,12 +639,14 @@ class Database
             'display_name = :display_name',
             'email = :email',
             'role = :role',
+            'region = :region',
             'is_active = :is_active',
         ];
         $params = [
             'display_name' => $fields['display_name'],
             'email'        => $fields['email'],
             'role'         => $fields['role'],
+            'region'       => $fields['region'] ?? null,
             'is_active'    => $fields['is_active'] ? 'true' : 'false',
             'id'           => $userId,
         ];

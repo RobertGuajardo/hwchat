@@ -169,8 +169,8 @@ function canAccessPage(string $page): bool {
         'leads'          => ['superadmin', 'regional_admin', 'tenant_admin'],
         'analytics'      => ['superadmin', 'regional_admin', 'tenant_admin', 'builder'],
         'users'          => ['superadmin', 'regional_admin'],
-        'settings'       => ['superadmin', 'regional_admin', 'tenant_admin'],
-        'knowledge'      => ['superadmin', 'regional_admin', 'tenant_admin'],
+        'settings'       => ['superadmin', 'tenant_admin'],
+        'knowledge'      => ['superadmin', 'tenant_admin'],
         'bookings'       => ['superadmin', 'regional_admin', 'tenant_admin', 'builder'],
     ];
     $allowed = $matrix[$page] ?? [];
