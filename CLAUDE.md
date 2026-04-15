@@ -34,7 +34,8 @@ hwchat/
 │   └── flush-cache.php     # Cache invalidation
 ├── lib/                    # Core classes
 │   ├── Database.php        # Static PDO singleton — all DB queries
-│   ├── LLMClassifier.php   # Analytics LLM classification helper (NEW)
+│   ├── LLMClassifier.php   # Analytics LLM classification helper
+│   ├── regions.php         # REGIONS constant + scope helpers (scope selector feature)
 │   ├── CecilianXO.php      # Cecilian XO property API client (homes/homesites)
 │   └── Embeddings.php      # OpenAI text-embedding-3-small → pgvector
 ├── dashboard/              # Admin panel (PHP + HTML)
@@ -46,25 +47,26 @@ hwchat/
 │   ├── knowledge-base.php  # KB management + website scraper
 │   ├── leads.php           # Lead viewer
 │   ├── bookings.php        # Booking viewer
-│   ├── analytics.php       # Analytics dashboard (NEW)
+│   ├── analytics.php       # Analytics dashboard
 │   ├── api.php             # Dashboard AJAX handler
-│   ├── api-analytics.php   # Analytics chart data endpoint (NEW)
-│   ├── export-analytics.php # CSV export (NEW)
-│   ├── switch-tenant.php   # Multi-tenant switcher (NEW)
+│   ├── api-analytics.php   # Analytics chart data endpoint
+│   ├── api/set-scope.php   # Scope switch endpoint (scope selector feature)
+│   ├── export-analytics.php # CSV export
+│   ├── switch-tenant.php   # Multi-tenant switcher
 │   └── super/              # Superuser admin
 │       ├── tenants.php     # Multi-tenant management
-│       ├── tenant-edit.php # Individual tenant config
+│       ├── tenant-edit.php # Individual tenant config (includes region dropdown)
 │       ├── communities.php # Community directory
 │       ├── master-prompt.php # Global system prompt
-│       └── leads.php       # Cross-tenant lead viewer
+│       └── leads.php       # Cross-tenant lead viewer (scope-aware)
 ├── widget/
 │   └── robchat.js          # Bundled/minified chat widget (Shadow DOM, vanilla JS)
 ├── scripts/                # Maintenance & scraping
-│   ├── analytics-tagger.php # Nightly analytics job (NEW)
+│   ├── analytics-tagger.php # Nightly analytics job
 │   ├── scrape-wp-universal.php  # WordPress site scraper
 │   ├── backfill-embeddings.php  # Regenerate embeddings
 │   └── scrape-all.sh            # Batch scrape all communities
-├── migrations/             # PostgreSQL schema (001–019, applied in order)
+├── migrations/             # PostgreSQL schema (001–020, applied in order)
 ├── config.php              # LIVE CREDENTIALS — gitignored, never committed
 ├── config.example.php      # Template for config.php
 ├── .htaccess               # Apache routing
@@ -86,10 +88,12 @@ hwchat/
 9. Response parsed for `[ACTION:...]` blocks (show_lead_form, show_calendar, etc.)
 
 ### Multi-Tenancy Model
-- Each tenant has a unique `id` (e.g., `hw_harvest`, `hw_treeline`)
+- Each tenant has a unique `id` column (PK) — e.g. `hw_harvest`, `hw_treeline`
+- Other tables reference tenants via `tenant_id` foreign key columns
 - `community_type` field: `community`, `parent`, `realtor`, `kiosk`, `standard`
 - Parent-child linking via `parent_tenant_id` (kiosk → community → parent)
 - Per-tenant: system prompt, LLM keys, branding colors, allowed CORS origins, XO config, HubSpot config
+- `region` column (nullable) ties community tenants to a geographic region (DFW / Houston / Austin) — used for analytics grouping, not navigation. NULL region = excluded from scope system.
 
 ### Widget Embedding
 ```html
@@ -100,8 +104,9 @@ Widget uses Shadow DOM for style isolation. All theming comes from tenant config
 
 ### Database
 - **PostgreSQL 16** with **pgvector** for embeddings
-- Tables: `tenants`, `sessions`, `messages`, `leads`, `bookings`, `kb_entries`, `kb_sources`, `availability_rules`, `availability_overrides`, `rate_limits`, `builders`, `chat_analytics` (NEW), `chat_analytics_log` (NEW), `users` (NEW), `user_tenants` (NEW), `global_settings`
-- Migrations in `/migrations/` (001–016 existing, 017 analytics schema, 018 user accounts, 019 auth migration)
+- Tables: `tenants`, `sessions`, `messages`, `leads`, `bookings`, `kb_entries`, `kb_sources`, `availability_rules`, `availability_overrides`, `rate_limits`, `builders`, `chat_analytics`, `chat_analytics_log`, `users`, `user_tenants`, `global_settings`
+- **Important:** Tenants table PK is `id` (not `tenant_id`). Other tables use `tenant_id` as the FK.
+- Migrations in `/migrations/` (001–019 applied, 020 next available)
 - `Database.php` is a static class — no ORM, all raw SQL via PDO
 
 ### External Integrations
@@ -135,7 +140,7 @@ ALTER TABLE ...;
 CREATE TABLE ...;
 INSERT INTO ... ON CONFLICT ... DO NOTHING;
 ```
-- Next available number: 017 (analytics), 018 (user accounts), 019 (auth migration)
+- Next available number: 020
 - Use `IF NOT EXISTS` for CREATE TABLE, `ON CONFLICT DO NOTHING` for INSERT
 - Include the run command in the header comment
 
@@ -252,6 +257,8 @@ require_once __DIR__ . '/bootstrap.php';
 - **Never** run migrations out of order — they depend on each other
 - **Never** hardcode tenant-specific logic in chat.php — use the tenant config / system prompt
 - **Never** add Composer or npm dependencies — this project is intentionally dependency-free on the backend
+- **Never** build scope SQL manually — always use `buildScopeWhereClause()` from `lib/regions.php`
+- **Never** use `tenant_id` when querying the tenants table directly — the PK column is `id`
 
 ### ALWAYS DO
 - Validate auth and role at the top of every dashboard page and API endpoint
@@ -278,13 +285,103 @@ require_once __DIR__ . '/bootstrap.php';
 
 ## Active Hillwood Communities
 
-Harvest, Treeline, Pecan Square, Union Park, Wolf Ranch, Valencia, Pomona, Lilyana, Ramble, Landmark, Legacy, Melina, plus the parent tenant (hillwoodcommunities.com).
+Harvest, Treeline, Pecan Square, Union Park, Wolf Ranch, Valencia, Pomona, Lilyana, Ramble, Landmark, Legacy, Melina, plus the parent tenant (hillwoodcommunities.com) and Hillwood Loves Realtors.
+
+Non-community tenants (excluded from scope system): demo_001 (Acme AI Assistant), hw_superadmin (Hillwood Admin).
+
+## Scope Selector & Region Infrastructure
+
+**Spec:** `specs/SPEC-REGION-SCOPING.md`
+**Tasks:** `tasks/TASKS-REGION-SCOPING.md`
+**Migration:** 020
+
+### What This Feature Does
+
+Adds an "All Communities" option to the superadmin topbar dropdown so aggregate data can be viewed across all community tenants. The dropdown stays flat — no region grouping in navigation. Separately, a `region` column on the `tenants` table ties each community to a geographic region (DFW / Houston / Austin) as infrastructure for the Phase 2 analytics dashboard, where region will be a filter/sort dimension.
+
+### Two Separate Concerns
+
+1. **Dropdown & scope** — "All Communities" + flat list of individual tenants (only those with non-null region). Two scope types: `all` and `tenant`. No region-level scoping in the dropdown.
+2. **Region data layer** — `region` column on `tenants` (nullable), REGIONS constant, region dropdown on tenant-edit. This exists for analytics, not for the topbar.
+
+### Region Mapping (confirmed from DB)
+
+| id | display_name | region |
+|----|-------------|--------|
+| hw_harvest | Harvest by Hillwood | dfw |
+| hw_treeline | Treeline by Hillwood | dfw |
+| hw_pecan_square | Pecan Square by Hillwood | dfw |
+| hw_union_park | Union Park by Hillwood | dfw |
+| hw_lilyana | Lilyana by Hillwood | dfw |
+| hw_landmark | Landmark by Hillwood | dfw |
+| hw_ramble | Ramble by Hillwood | dfw |
+| hw_parent | Hillwood Communities | dfw |
+| hw_realtors | Hillwood Loves Realtors | dfw |
+| hw_pomona | Pomona by Hillwood | houston |
+| hw_legacy | Legacy by Hillwood | houston |
+| hw_valencia | Valencia by Hillwood | houston |
+| hw_wolf_ranch | Wolf Ranch by Hillwood | austin |
+| hw_melina | Melina by Hillwood | austin |
+| demo_001 | Acme AI Assistant | NULL |
+| hw_superadmin | Hillwood Admin | NULL |
+
+### Nullable Region Logic
+
+- `region IS NOT NULL` = community tenant, participates in scope system, appears in dropdown and aggregates
+- `region IS NULL` = excluded from everything — dropdown, aggregate views, analytics
+- "All Communities" scope means `WHERE tenant_id IN (SELECT id FROM tenants WHERE region IS NOT NULL)` — not literally all rows
+
+### Key Files (Scope Selector)
+
+| File | Purpose |
+|------|---------|
+| `lib/regions.php` | REGIONS constant, scope helpers (`getScopedTenantIds`, `buildScopeWhereClause`, `getScopeLabel`) |
+| `migrations/020-add-region-column.sql` | Adds `region TEXT DEFAULT NULL` to tenants table with CHECK constraint |
+| `dashboard/includes/layout.php` | "All Communities" added to topbar dropdown + header label fix |
+| `dashboard/api/set-scope.php` | Endpoint to update `$_SESSION` scope on dropdown selection |
+| `dashboard/super/tenant-edit.php` | Region dropdown added to tenant settings |
+| `dashboard/super/leads.php` | Scope-aware filtering + Community column when viewing all |
+
+### Session Variables (Scope)
+
+```php
+$_SESSION['scope_type']  = 'all' | 'tenant';
+$_SESSION['scope_value'] = null | '{tenant id}';  // e.g. 'hw_harvest'
+```
+
+Superadmin login defaults to `scope_type = 'all'`.
+
+### Code Patterns for Scope
+
+Always use `buildScopeWhereClause()` for scope filtering — never build scope SQL manually:
+
+```php
+require_once __DIR__ . '/../lib/regions.php';
+$scope = buildScopeWhereClause('l');  // 'l' = table alias for leads
+$sql = "SELECT l.* FROM leads l WHERE 1=1 {$scope['clause']} ORDER BY l.created_at DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($scope['params']);
+```
+
+Note: `buildScopeWhereClause()` targets the `tenant_id` FK column on the aliased table (not the tenants table `id` column directly).
+
+### Constraints (Scope Selector)
+
+- Region column has a CHECK constraint: `region IN ('dfw', 'houston', 'austin')` — NULL is allowed (passes CHECK by default in PostgreSQL)
+- Adding a new region requires: (1) ALTER the CHECK constraint, (2) add to REGIONS constant
+- Scope dropdown is superadmin-only — tenant_admin users never see it
+- Tenant View mode requires a specific tenant selected (cannot impersonate "all")
+- Region does NOT affect the dropdown or scope system — it is metadata for analytics only
+
+### Known Gotcha
+
+The superadmin header in `layout.php` topbar-left currently shows the first tenant's name instead of a generic label. Task C.2 fixes this to show `getScopeLabel()` — either "Hillwood AI Chatbot" (all) or the tenant display name.
 
 ## Current Feature Work
 
-- **Feature Spec:** SPEC-ANALYTICS.md
-- **Task Decomposition:** TASKS-ANALYTICS.md
-- **Current Phase:** Starting Phase 1 (Schema + Migrations)
+- **Feature Spec:** SPEC-REGION-SCOPING.md (Scope Selector & Region Infrastructure)
+- **Task Decomposition:** TASKS-REGION-SCOPING.md
+- **Current Phase:** Starting Phase A (Database & Region Infrastructure)
 
 ## Testing Approach
 

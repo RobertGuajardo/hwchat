@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
+require_once __DIR__ . '/../../lib/regions.php';
 requireSuperAdmin();
 
 $db = Database::db();
@@ -60,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
                 hubspot_portal_id = :hubspot_portal_id,
                 hubspot_form_id = :hubspot_form_id,
                 allowed_origins = :allowed_origins,
+                region = :region,
                 updated_at = NOW()
             WHERE id = :id
         ');
@@ -103,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
             'hubspot_portal_id'  => trim($_POST['hubspot_portal_id'] ?? ''),
             'hubspot_form_id'    => trim($_POST['hubspot_form_id'] ?? ''),
             'allowed_origins'    => json_encode(array_values($origins)),
+            'region'             => ($r = trim($_POST['region'] ?? '')) !== '' && in_array($r, array_keys(REGIONS)) ? $r : null,
             'id'                 => $tenantId,
         ]);
 
@@ -187,13 +190,25 @@ renderNav('tenants');
                         <input type="text" name="community_tagline" class="form-input" value="<?php echo e($tenant['community_tagline'] ?? ''); ?>" placeholder="Short description for directory">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">COMMUNITY TYPE</label>
-                    <select name="community_type" class="form-select">
-                        <?php foreach (['community','standard','parent','realtor','kiosk'] as $ct): ?>
-                            <option value="<?php echo $ct; ?>" <?php echo ($tenant['community_type'] ?? '') === $ct ? 'selected' : ''; ?>><?php echo strtoupper($ct); ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">COMMUNITY TYPE</label>
+                        <select name="community_type" class="form-select">
+                            <?php foreach (['community','standard','parent','realtor','kiosk'] as $ct): ?>
+                                <option value="<?php echo $ct; ?>" <?php echo ($tenant['community_type'] ?? '') === $ct ? 'selected' : ''; ?>><?php echo strtoupper($ct); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">REGION</label>
+                        <select name="region" class="form-select">
+                            <option value="">None</option>
+                            <?php foreach (REGIONS as $key => $label): ?>
+                                <option value="<?php echo e($key); ?>" <?php echo ($tenant['region'] ?? '') === $key ? 'selected' : ''; ?>><?php echo e($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-hint">Tenants with no region are excluded from the scope dropdown and aggregate views.</div>
+                    </div>
                 </div>
             </div>
 
