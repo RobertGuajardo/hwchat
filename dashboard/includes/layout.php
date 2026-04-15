@@ -397,9 +397,13 @@ function renderNav(string $active = 'overview'): void {
         </div>
         <div class="topbar-right">
             <?php if ($isSuper && !$inSuperDir): ?>
-                <a href="super/index.php" class="btn btn-sm" style="color:var(--gold);border-color:rgba(201,169,110,0.3);">ADMIN PANEL</a>
+                <a href="super/index.php" class="btn btn-sm" style="color:var(--gold);border-color:rgba(201,169,110,0.3);" onclick="fetch('api/set-scope.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({restore_admin_scope:true})});">ADMIN PANEL</a>
             <?php elseif ($isSuper && $inSuperDir): ?>
-                <a href="../index.php" class="btn btn-sm btn-ghost">TENANT VIEW</a>
+                <?php if (($_SESSION['scope_type'] ?? 'all') === 'all'): ?>
+                <a href="#" class="btn btn-sm btn-ghost" onclick="document.getElementById('pickTenantModal').style.display='flex';return false;">TENANT VIEW</a>
+                <?php else: ?>
+                <a href="#" class="btn btn-sm btn-ghost" onclick="fetch('../api/set-scope.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope_type:'tenant',scope_value:'<?php echo e($_SESSION['scope_value']); ?>',save_admin_scope:true})}).then(function(r){return r.json()}).then(function(d){if(d.success)window.location.href='../index.php'});return false;">TENANT VIEW</a>
+                <?php endif; ?>
             <?php endif; ?>
             <!-- Theme Switcher -->
             <div style="display:flex;gap:4px;align-items:center;margin:0 4px;" title="Switch theme">
@@ -466,6 +470,36 @@ function renderNav(string $active = 'overview'): void {
             <a href="<?php echo $inSuperDir ? '../' : ''; ?>logout.php" class="btn btn-ghost btn-sm">LOGOUT</a>
         </div>
     </header>
+    <?php if ($isSuper && $inSuperDir && ($_SESSION['scope_type'] ?? 'all') === 'all'): ?>
+    <!-- Pick Tenant modal — shown when entering Tenant View from "All Communities" scope -->
+    <div id="pickTenantModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;">
+        <div style="background:var(--bg-topbar);border:1px solid var(--border-light);padding:32px;width:100%;max-width:400px;">
+            <h3 style="margin-bottom:8px;">SELECT A COMMUNITY</h3>
+            <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Choose a community to view in Tenant View mode.</p>
+            <select id="pickTenantSelect" class="form-select" style="width:100%;margin-bottom:16px;">
+                <?php foreach (getScopedTenantList() as $pt): ?>
+                    <option value="<?php echo e($pt['id']); ?>"><?php echo e($pt['display_name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary" onclick="enterTenantView()">GO</button>
+                <button class="btn" onclick="document.getElementById('pickTenantModal').style.display='none'">CANCEL</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    function enterTenantView() {
+        var tid = document.getElementById('pickTenantSelect').value;
+        fetch('../api/set-scope.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scope_type: 'tenant', scope_value: tid, save_admin_scope: true})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.success) window.location.href = '../index.php';
+        });
+    }
+    </script>
+    <?php endif; ?>
     <script>
     function setTheme(t) {
         document.documentElement.setAttribute('data-theme', t);

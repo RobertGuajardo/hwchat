@@ -74,6 +74,11 @@ function attemptLogin(string $email, string $password): bool {
         // Backward-compatible session vars
         $_SESSION['tenant_email']  = $user['email'];
         $_SESSION['tenant_role']   = $user['role'];
+        // Superadmin defaults to "All Communities" scope
+        if ($user['role'] === 'superadmin') {
+            $_SESSION['scope_type']  = 'all';
+            $_SESSION['scope_value'] = null;
+        }
         return true;
     }
 
