@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/../lib/regions.php';
 
 header('Content-Type: application/json');
 
@@ -19,9 +20,10 @@ if (!in_array($chart, $validCharts)) {
     exit;
 }
 
-// Scope tenant access
+// Scope-aware tenant filtering
 if (isSuperAdmin()) {
-    $tenantId = !empty($_GET['tenant']) ? $_GET['tenant'] : null;
+    $scopeType = $_SESSION['scope_type'] ?? 'all';
+    $tenantId  = $scopeType === 'tenant' ? ($_SESSION['scope_value'] ?? null) : null;
 } else {
     $tenantId = getTenantId();
 }

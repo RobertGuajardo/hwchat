@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../auth.php';
 require_once __DIR__ . '/../includes/layout.php';
+require_once __DIR__ . '/../../lib/regions.php';
 requireSuperAdmin();
 
 $db = Database::db();
@@ -29,14 +30,13 @@ if ($period === 'custom' && !empty($_GET['after'])) {
     }
 }
 
-// ─── Tenant filter (superadmin: default to all) ───
-$filterTenant = $_GET['tenant'] ?? '';
-$tenantId = $filterTenant ?: null;
+// ─── Tenant filter (scope-aware) ───
+$scopeType = $_SESSION['scope_type'] ?? 'all';
+$tenantId  = $scopeType === 'tenant' ? ($_SESSION['scope_value'] ?? null) : null;
 
 // Build query string for links
 $qs = http_build_query(array_filter([
     'period' => $period,
-    'tenant' => $filterTenant,
     'after'  => $period === 'custom' ? $after : null,
     'before' => $period === 'custom' ? $before : null,
 ]));
@@ -48,10 +48,6 @@ $summary = Database::getAnalyticsSummary($tenantId, $after, $before);
 $durMin = (int)floor(($summary['avg_duration_sec'] ?? 0) / 60);
 $durSec = ($summary['avg_duration_sec'] ?? 0) % 60;
 $durationFormatted = $durMin > 0 ? "{$durMin}m {$durSec}s" : "{$durSec}s";
-
-// Tenant list for filter
-$stmt = $db->query("SELECT id, community_name, display_name FROM tenants WHERE role = 'tenant_admin' AND is_active = TRUE ORDER BY community_name, display_name");
-$tenantList = $stmt->fetchAll();
 
 renderHead('Analytics');
 renderNav('analytics');
@@ -67,16 +63,6 @@ renderNav('analytics');
                 <?php endforeach; ?>
             </div>
 
-            <label class="filter-label" style="margin-left:16px;">COMMUNITY</label>
-            <select name="tenant" class="form-select" style="width:auto;padding:6px 10px;font-size:11px;" onchange="this.form.submit()">
-                <option value="">All Communities</option>
-                <?php foreach ($tenantList as $tl): ?>
-                    <option value="<?php echo e($tl['id']); ?>" <?php echo $filterTenant === $tl['id'] ? 'selected' : ''; ?>>
-                        <?php echo e($tl['community_name'] ?: $tl['display_name']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-
             <input type="hidden" name="period" value="<?php echo e($period); ?>">
         </form>
 
@@ -91,7 +77,6 @@ renderNav('analytics');
                 <input type="date" name="before" class="form-input" style="width:160px;padding:6px 10px;font-size:12px;" value="<?php echo e($period === 'custom' ? ($before ?? '') : ''); ?>">
             </div>
             <input type="hidden" name="period" value="custom">
-            <?php if ($filterTenant): ?><input type="hidden" name="tenant" value="<?php echo e($filterTenant); ?>"><?php endif; ?>
             <button type="submit" class="btn btn-sm">APPLY</button>
             <div style="margin-left:auto;">
                 <a href="../export-analytics.php?<?php echo e($qs); ?>" class="btn btn-sm">EXPORT CSV</a>
